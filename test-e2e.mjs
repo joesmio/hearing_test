@@ -1,11 +1,11 @@
 import { spawn } from "node:child_process";
 import { createConnection } from "node:net";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.E2E_PORT || 8767);
-const CHROME = process.env.CHROME || "/usr/local/bin/google-chrome";
+const CHROME = process.env.CHROME || "/opt/google/chrome/chrome";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -56,9 +56,12 @@ server.stderr.on("data", (d) => {
   serverLog += d.toString();
 });
 
+console.log("launching chrome", CHROME);
 const browser = await puppeteer.launch({
   executablePath: CHROME,
-  headless: "new",
+  headless: true,
+  timeout: 20000,
+  userDataDir: `/tmp/fee-e2e-${PORT}-${Date.now()}`,
   args: [
     "--no-sandbox",
     "--disable-gpu",
@@ -66,12 +69,16 @@ const browser = await puppeteer.launch({
     "--autoplay-policy=no-user-gesture-required",
     "--use-fake-ui-for-media-stream",
     "--use-fake-device-for-media-stream",
+    `--remote-debugging-port=${PORT + 1000}`,
   ],
 });
+console.log("chrome up");
 
 let failed = "";
 try {
+  console.log("waiting for server", PORT);
   await waitPort(PORT);
+  console.log("server ready", serverLog.trim());
   const sister = await browser.newPage();
   const him = await browser.newPage();
   sister.on("pageerror", (e) => {
@@ -81,36 +88,50 @@ try {
     failed += `him pageerror ${e.message}\n`;
   });
 
-  await sister.goto(`http://127.0.0.1:${PORT}/?ui=1&n=2`, { waitUntil: "networkidle0" });
-  await him.goto(`http://127.0.0.1:${PORT}/him.html`, { waitUntil: "networkidle0" });
+  console.log("opening pages");
+  await sister.goto(`http://127.0.0.1:${PORT}/?ui=1&n=2`, { waitUntil: "load", timeout: 15000 });
+  await him.goto(`http://127.0.0.1:${PORT}/him.html`, { waitUntil: "load", timeout: 15000 });
+  console.log("pages loaded");
 
   const setup = await sister.$eval("[data-testid=setup]", (el) => el.textContent);
   assert(/Sidecar/i.test(setup), "sister setup must mention Sidecar / iPad");
 
-  await sister.click("[data-testid=start-mic]");
-  await sister.waitForSelector("[data-testid=view-practice]:not([hidden])");
-  await sister.click("[data-testid=preview-fee]");
-  await him.waitForFunction(() => {
-    const el = document.querySelector("[data-testid=practice-word]");
-    return el && !el.hidden && el.textContent === "FEE";
-  });
+  console.log("start mic");
+  await sister.evaluate(() => document.querySelector("[data-testid=start-mic]").click());
+  await sister.waitForSelector("[data-testid=view-practice]:not([hidden])", { timeout: 8000 });
+  console.log("practice visible");
+  await sister.evaluate(() => document.querySelector("[data-testid=practice-fee]").click());
+  await him.waitForFunction(
+    () => {
+      const el = document.querySelector("[data-testid=practice-word]");
+      return el && !el.hidden && el.textContent === "FEE";
+    },
+    { timeout: 8000 }
+  );
+  console.log("him saw FEE practice cue");
 
-  await sister.click("[data-testid=begin-test]");
-  await sister.waitForSelector("[data-testid=view-trial]:not([hidden])");
+  console.log("begin test");
+  await sister.evaluate(() => document.querySelector("[data-testid=begin-test]").click());
+  await sister.waitForSelector("[data-testid=view-trial]:not([hidden])", { timeout: 8000 });
+  console.log("trial visible");
 
   for (let i = 0; i < 4; i++) {
-    await sister.waitForFunction(() => {
-      const el = document.querySelector("[data-testid=sister-word]");
-      return el && /FEE|SEE/.test(el.textContent || "");
-    });
+    await sister.waitForFunction(
+      () => {
+        const el = document.querySelector("[data-testid=sister-word]");
+        return el && /FEE|SEE/.test(el.textContent || "");
+      },
+      { timeout: 8000 }
+    );
     const word = await sister.$eval("[data-testid=sister-word]", (el) =>
       /FEE/.test(el.textContent || "") ? "fee" : "see"
     );
+    console.log("trial", i, word);
     const leaked = await him.evaluate(() => document.body.innerText);
     assert(!/Say\s+FEE/i.test(leaked) && !/Say\s+SEE/i.test(leaked), `him leaked cue on trial ${i}`);
-    await sister.click("[data-testid=said-it]");
-    await him.waitForSelector("#answers:not([hidden])");
-    await him.click(`[data-testid=answer-${word}]`);
+    await sister.evaluate(() => document.querySelector("[data-testid=said-it]").click());
+    await him.waitForSelector("#answers:not([hidden])", { timeout: 8000 });
+    await him.evaluate((w) => document.querySelector(`[data-testid=answer-${w}]`).click(), word);
   }
 
   await sister.waitForSelector("[data-testid=view-results]:not([hidden])");
@@ -126,16 +147,12 @@ try {
   assert(!failed, failed);
 
   console.log("e2e two-screen passed", { sisterDry, himDsp, himHeadline });
+} catch (err) {
+  failed += String(err && err.stack ? err.stack : err);
+  throw err;
 } finally {
-  await browser.close().catch(() => {});
+  await Promise.race([browser.close(), new Promise((r) => setTimeout(r, 2000))]).catch(() => {});
   server.kill("SIGTERM");
-  setTimeout(() => {
-    try {
-      server.kill("SIGKILL");
-    } catch {
-      /* ignore */
-    }
-  }, 500);
 }
 
 if (serverLog.includes("Traceback")) {

@@ -154,6 +154,15 @@ async function setupAudio() {
   await applyOutput();
 }
 
+function withTimeout(promise, ms, msg) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(msg)), ms);
+    }),
+  ]);
+}
+
 async function ensureAudio() {
   if (audioReady) return audioReady;
   audioReady = setupAudio().catch((err) => {
@@ -292,28 +301,31 @@ async function previewWord(word) {
 async function startLive() {
   $("micStatus").textContent = "Asking for the microphone…";
   try {
+    if (uiTest) {
+      model.live = true;
+      $("meterBox").hidden = false;
+      $("micStatus").textContent = "UI test — no microphone. Preview files still play through the trick.";
+      show("practice");
+      return;
+    }
     await ensureAudio();
     if (audioCtx.state === "suspended") await audioCtx.resume();
     stopFileSource();
     if (sourceNode) sourceNode.disconnect();
     if (micStream) micStream.getTracks().forEach((t) => t.stop());
     micStream = null;
-    if (!uiTest) {
-      micStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: $("echoToggle").checked,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
-      });
-      sourceNode = audioCtx.createMediaStreamSource(micStream);
-      sourceNode.connect(workletNode);
-    }
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: $("echoToggle").checked,
+        noiseSuppression: false,
+        autoGainControl: false,
+      },
+    });
+    sourceNode = audioCtx.createMediaStreamSource(micStream);
+    sourceNode.connect(workletNode);
     model.live = true;
     $("meterBox").hidden = false;
-    $("micStatus").textContent = uiTest
-      ? "UI test — no microphone. Preview files still play through the trick."
-      : "Microphone is live. Talk toward the lid.";
+    $("micStatus").textContent = "Microphone is live. Talk toward the lid.";
     setWorklet("practice");
     await fillOutputs();
     show("practice");

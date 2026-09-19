@@ -51,6 +51,12 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
+    def end_headers(self):
+        path = urlparse(self.path).path
+        if path.endswith((".html", ".js", ".css", ".mjs")):
+            self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path == "/sync":
