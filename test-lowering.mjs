@@ -44,8 +44,14 @@ const destAfter = spectrumBandEnergy(mapped.aidRe, mapped.aidIm, see.sr, SIBILAN
 assert(destAfter > destBefore * 1.5, `transpose must move s energy into 1–2 kHz (${destBefore} → ${destAfter})`);
 
 const feeMap = transposeLikeProcessor(fee.samples, fee.sr, SIBILANT_PLAN);
+const feeBefore = spectrumBandEnergy(feeMap.re, feeMap.im, fee.sr, SIBILANT_PLAN.dstLo, SIBILANT_PLAN.dstHi);
 const feeDest = spectrumBandEnergy(feeMap.aidRe, feeMap.aidIm, fee.sr, SIBILANT_PLAN.dstLo, SIBILANT_PLAN.dstHi);
-assert(destAfter > feeDest, "after remap, see should still out-hiss fee in the landing band");
+const seeDelta = destAfter - destBefore;
+const feeDelta = feeDest - feeBefore;
+assert(
+  seeDelta > feeDelta * 4,
+  `see should dump more 4–8 kHz into 1–2 kHz than fee (${seeDelta} vs ${feeDelta})`
+);
 
 console.log("lowering tests passed", {
   landed: Math.round(landed),
@@ -53,4 +59,6 @@ console.log("lowering tests passed", {
   feeHi: Math.round(feeHi),
   destBefore: Math.round(destBefore),
   destAfter: Math.round(destAfter),
+  seeDelta: Math.round(seeDelta),
+  feeDelta: Math.round(feeDelta),
 });
