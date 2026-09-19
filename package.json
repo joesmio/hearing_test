@@ -1,0 +1,10 @@
+{
+  "name": "hearing-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test-protocol.mjs && node test-sync.mjs && node test-html.mjs && node test-lowering.mjs && node test-two-screen.mjs && node test-fft.mjs && node test-plan.mjs",
+    "test:e2e": "node test-e2e.mjs",
+    "start": "python3 server.py --port 8765"
+  }
+}

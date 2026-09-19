@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Fee or See</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="h-body" data-role="him">
+  <main class="h-app" data-testid="listener-face">
+    <p class="g-kicker" data-testid="kicker">Your screen · iPad or second window</p>
+    <h1>Fee or See?</h1>
+    <p id="linkLamp" class="g-lamp" data-testid="link-lamp">waiting for her laptop</p>
+    <p id="prompt" class="g-prompt" data-testid="listener-prompt">Headphones on. Wait for her.</p>
+    <p id="blockLabel" class="g-block" data-testid="block-label"></p>
+    <p id="practiceWord" class="g-cue-word" hidden data-testid="practice-word"></p>
+    <div id="answers" class="g-answers" hidden>
+      <button type="button" class="g-word-btn fee" data-word="fee" data-testid="answer-fee">FEE</button>
+      <button type="button" class="g-word-btn see" data-word="see" data-testid="answer-see">SEE</button>
+    </div>
+    <section id="results" hidden data-testid="view-results">
+      <h2 id="resultHeadline" data-testid="result-headline"></h2>
+      <p id="resultBody"></p>
+      <div class="g-scores">
+        <div><p>No trick</p><b id="scoreDry" data-testid="score-dry"></b></div>
+        <div><p>With the computer</p><b id="scoreDsp" data-testid="score-dsp"></b></div>
+      </div>
+    </section>
+    <p id="hissLamp" class="g-lamp" data-testid="hiss-lamp">hiss</p>
+  </main>
+  <script type="module" src="him.js"></script>
+</body>
+</html>

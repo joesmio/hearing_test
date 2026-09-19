@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hearing lab</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <p class="eyebrow">MacBook station · not a medical device</p>
+    <h1>Live listen for the missing band.</h1>
+    <p class="lede">
+      Sit the laptop by your sister. Put headphones on him. The Mac hears
+      her <em>f</em> and <em>s</em> and copies them down into a band he may
+      still have.
+    </p>
+
+    <section class="card station" id="live">
+      <h2>Mac setup</h2>
+      <ol class="checks">
+        <li>Plug in <strong>wired</strong> over-ears if you can. Bluetooth ANC often lags 150–300&nbsp;ms and will feel like a bad phone call. Many ANC sets still take a cable.</li>
+        <li><strong>System Settings → Sound</strong>: Output = his headphones. Input = MacBook Microphone (or a cheap lav on your sister).</li>
+        <li>Turn Mac volume to about half. He wears the headphones <em>before</em> you press start, or the laptop speakers will howl.</li>
+        <li>Point the top of the lid toward your sister — that is the mic. Aids out if you can, so you are not stacking two processors.</li>
+        <li>The audiogram starts on <strong>Ski-slope highs</strong> (the usual <em>f</em>/<em>s</em> pattern). Drag it to match his test if you have one.</li>
+      </ol>
+      <p class="hint">He must hear <strong>aid output</strong> — the remapped sound — not the “his ear” demo path. Live mode locks that for you.</p>
+
+      <div class="row">
+        <label>Microphone
+          <select class="device" id="micSelect"></select>
+        </label>
+      </div>
+      <p class="hint" style="margin-top:0">Algorithm he hears</p>
+      <div class="modes" id="liveModes"></div>
+      <div class="row vol">
+        <button class="live-go" id="liveBtn" type="button">Start live listen</button>
+        <label>Level <input id="liveGain" type="range" min="0.05" max="1.2" step="0.01" value="0.45" /></label>
+        <label class="check" style="margin:0">
+          <input type="checkbox" id="echoToggle" />
+          Echo cancel (on if it howls; off keeps more of <em>s</em>)
+        </label>
+      </div>
+      <p class="meter" id="liveMeter">Idle — headphones on, then start.</p>
+      <p class="warn" id="liveWarn"></p>
+    </section>
+
+    <p class="note">
+      Kitchen experiment, not a fitting. Comfortable loudness only. A real
+      aid still wins for all-day wear. The lab below is for <em>you</em> to
+      hear the hole; the station above is for <em>him</em>.
+    </p>
+
+    <div class="grid">
+      <section class="card">
+        <h2>1. The ear</h2>
+        <p class="hint">Drag the points. Standard audiogram: quiet at the top, deaf at the bottom. Bands at or below the red line are treated as dead — amplifying them does nothing.</p>
+        <div class="presets" id="presets"></div>
+        <div class="audiogram-wrap">
+          <canvas id="audiogram" width="720" height="420" aria-label="Interactive audiogram"></canvas>
+        </div>
+        <div class="legend">
+          <span><i class="swatch" style="background:#1d5f5a"></i>Threshold</span>
+          <span><i class="swatch" style="background:#a43b28"></i>Dead (≥90 dB)</span>
+          <span><i class="swatch" style="background:#c9bba4"></i>Speech banana</span>
+        </div>
+        <label class="check">
+          <input type="checkbox" id="deadToggle" checked />
+          Treat 90 dB HL and worse as a dead region (the sensors are gone, not just quiet).
+        </label>
+      </section>
+
+      <section class="card verdict" id="verdict" data-kind="lowering">
+        <p class="kicker" id="verdictKicker">Estimate</p>
+        <h2 id="verdictTitle">Lowering territory</h2>
+        <p id="verdictSummary"></p>
+        <div class="scoreline">
+          <b id="siiValue">0.00</b>
+          <div class="bar" aria-hidden="true"><span id="siiBar"></span></div>
+        </div>
+        <p class="hint">Rough leftover speech information (0 = none, 1 = a typical ear). Not a clinic SII.</p>
+        <p class="plan" id="planBlurb"></p>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:18px">
+      <h2>2. Hear what it does</h2>
+      <p class="hint">Start with <em>sss</em> vs <em>shh</em> — that contrast lives in the missing high band. Then try a word. Listen with “his ear” selected.</p>
+
+      <div class="sources" id="sources"></div>
+      <div class="row ctrl">
+        <button class="play" id="playBtn" type="button">Play</button>
+        <button id="micBtn" type="button">Use microphone</button>
+        <label>or <input id="file" type="file" accept="audio/*" /></label>
+        <span class="status" id="status"></span>
+      </div>
+
+      <p class="hint" style="margin-top:4px">Algorithm</p>
+      <div class="modes" id="modes"></div>
+
+      <p class="hint">Listen to</p>
+      <div class="listen" id="listen"></div>
+
+      <div class="spec-pair">
+        <div class="spec" id="specAidBox">
+          <header><span>Aid output</span><span>what the algorithm produces</span></header>
+          <canvas id="specAid" width="640" height="180"></canvas>
+          <div class="empty">Press Play — energy in the rust band is the missing slice.</div>
+        </div>
+        <div class="spec" id="specEarBox">
+          <header><span>After his ear</span><span>what gets through</span></header>
+          <canvas id="specEar" width="640" height="180"></canvas>
+          <div class="empty">The hole stays dark unless the sound is moved into the teal band.</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid" style="margin-top:18px">
+      <section class="card">
+        <h2>3. The other algorithm: captions</h2>
+        <p class="hint">If remapping still leaves you guessing the word, this is the channel that actually works. Click and speak; this uses the browser’s recogniser on your microphone.</p>
+        <div class="row">
+          <button id="captionBtn" type="button">Start live captions</button>
+          <span class="status" id="captionStatus"></span>
+        </div>
+        <div class="captions" id="captionBox"><span class="idle">Captions will land here.</span></div>
+      </section>
+
+      <section class="card when">
+        <h2>When is it caption territory?</h2>
+        <ol>
+          <li><strong>The landing band is gone.</strong> Frequency lowering only helps if some hearing remains around 1–2 kHz to receive the moved sound. If 500, 1 kHz <em>and</em> 2 kHz are all severe or worse, there is nowhere useful to put the missing band.</li>
+          <li><strong>He hears talking, not words.</strong> That sentence — “I know you’re speaking, I don’t know what you said” — is the clinical hint. Loudness is not the problem. The speech code is.</li>
+          <li><strong>Television, phone, and the dinner table already fail</strong> with the aids he has. Put captions on those now. Do not wait for a perfect aid. Lowering can still be tried; captions do not have to wait for the trial.</li>
+          <li><strong>Severe–profound in both ears</strong>, or aided word scores that stay poor in quiet, is cochlear-implant assessment territory as well as caption territory.</li>
+        </ol>
+        <p class="hint">Captions are not a consolation prize. They are the reliable algorithm. Lowering is a maybe that needs an audiologist and weeks of wear-in. Use both.</p>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="lab.js"></script>
+</body>
+</html>

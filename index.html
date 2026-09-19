@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sister — Fee or See</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="s-body" data-role="sister">
+  <main class="s-app" data-testid="sister-face">
+    <header>
+      <p class="g-kicker">Her laptop · live voice</p>
+      <h1>You say it. He taps it.</h1>
+      <p class="g-prompt">The Mac hears you. His screen never sees the word.</p>
+    </header>
+
+    <section class="s-card" data-testid="setup">
+      <ol class="g-steps">
+        <li>Headphones in the <strong>Mac</strong>, on him. Prefer a cable — Bluetooth adds lag.</li>
+        <li>Open his screen, then drag that window onto the iPad (Sidecar / extended display), or type the address below in iPad Safari. The iPad is taps only. Sound stays on the Mac.</li>
+        <li>You talk into the Mac lid. He only sees <strong>FEE</strong> and <strong>SEE</strong>.</li>
+      </ol>
+      <div class="s-row">
+        <button type="button" id="openHim" class="g-btn g-btn-dark" data-testid="open-him">Open his screen</button>
+        <button type="button" id="startMic" class="g-btn g-btn-go" data-testid="start-mic">Start the Mac microphone</button>
+      </div>
+      <p id="himUrl" class="s-url" data-testid="him-url"></p>
+      <p id="micStatus" class="g-status" data-testid="mic-status"></p>
+    </section>
+
+    <section id="view-practice" class="s-card" hidden data-testid="view-practice">
+      <p>Trick is on. Tap a word, then <strong>say it live</strong> toward the lid. His iPad can show the same word for practice.</p>
+      <div class="g-practice">
+        <button type="button" id="practiceFee" class="g-word-btn fee" data-testid="practice-fee">I will say FEE</button>
+        <button type="button" id="practiceSee" class="g-word-btn see" data-testid="practice-see">I will say SEE</button>
+      </div>
+      <p class="g-hint">Or play a take through his headphones so you can hear the hiss move before she talks.</p>
+      <div class="s-row">
+        <button type="button" id="previewFee" class="g-btn" data-testid="preview-fee">Play FEE through the trick</button>
+        <button type="button" id="previewSee" class="g-btn" data-testid="preview-see">Play SEE through the trick</button>
+        <label class="g-hint">Her recording <input id="herFile" type="file" accept="audio/*" data-testid="her-file" /></label>
+      </div>
+      <button type="button" id="beginTest" class="g-btn g-btn-dark" data-testid="begin-test">Start the scored live test</button>
+    </section>
+
+    <section id="view-trial" class="s-card" hidden data-testid="view-trial">
+      <p id="blockLabel" class="g-block" data-testid="block-label"></p>
+      <div class="g-progress" id="progress"></div>
+      <p id="sisterWord" class="g-cue-word" data-testid="sister-word">—</p>
+      <p id="sisterHint" class="g-hint"></p>
+      <button type="button" id="saidIt" class="g-btn g-btn-go" data-testid="said-it">I said it — unlock his buttons</button>
+      <p id="waitTap" class="g-status" hidden data-testid="wait-tap">Waiting for his tap…</p>
+    </section>
+
+    <section id="view-results" class="s-card" hidden data-testid="view-results">
+      <h2 id="resultHeadline" data-testid="result-headline"></h2>
+      <p id="resultBody"></p>
+      <div class="g-scores">
+        <div><p>Her voice, no trick</p><b id="scoreDry" data-testid="score-dry"></b></div>
+        <div><p>Computer moved the hiss</p><b id="scoreDsp" data-testid="score-dsp"></b></div>
+      </div>
+      <button type="button" id="again" class="g-btn g-btn-dark" data-testid="again">Again</button>
+    </section>
+
+    <div class="g-meter" id="meterBox" hidden>
+      <span>Your voice</span>
+      <div class="g-bar"><i id="levelBar"></i></div>
+      <span id="hissLamp" class="g-lamp" data-testid="hiss-lamp">hiss</span>
+      <label class="s-gain">Level <input id="liveGain" type="range" min="0.08" max="1.1" step="0.01" value="0.42" /></label>
+      <label class="s-gain">Headphones
+        <select id="outDevice" data-testid="out-device">
+          <option value="">Mac default (use the headphone jack)</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="echoToggle" /> Echo cancel</label>
+    </div>
+    <p id="appError" class="warn" data-testid="app-error"></p>
+    <p class="s-foot"><a href="lab.html">Lab</a></p>
+  </main>
+  <script type="module" src="sister.js"></script>
+</body>
+</html>
