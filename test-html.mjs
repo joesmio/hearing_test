@@ -17,6 +17,7 @@ for (const id of [
   "preview-fee",
   "preview-see",
   "her-file",
+  "run-length",
   "begin-test",
   "score-dry",
   "score-dsp",

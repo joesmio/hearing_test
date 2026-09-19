@@ -359,6 +359,10 @@ async function showWhere() {
   }
 }
 
+if ($("runLength")) {
+  $("runLength").textContent = `This run is ${perBlock} without the trick, then ${perBlock} with it — ${perBlock * 2} taps.`;
+}
+
 $("openHim").addEventListener("click", openHim);
 $("startMic").addEventListener("click", startLive);
 $("practiceFee").addEventListener("click", () => {
