@@ -88,7 +88,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"ok": True, "seq": STATE["seq"]})
         if parsed.path == "/sync/answer":
             word = data.get("word")
-            if word in {"fee", "see"}:
+            if word in {"fee", "see", "heard", "missed", "loud", "ok"}:
                 STATE["answers"].append(word)
             return self._json({"ok": True})
         return self._json({"error": "not found"}, 404)

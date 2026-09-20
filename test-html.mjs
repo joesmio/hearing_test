@@ -11,6 +11,9 @@ for (const id of [
   "sister-face",
   "open-him",
   "start-mic",
+  "start-ear",
+  "start-cal",
+  "play-cue",
   "sister-word",
   "said-it",
   "practice-fee",
@@ -34,6 +37,8 @@ for (const id of [
   "answer-see",
   "result-headline",
   "link-lamp",
+  "ear-answers",
+  "answer-heard",
 ]) {
   assert(him.includes(`data-testid="${id}"`), `him missing ${id}`);
 }
@@ -41,6 +46,9 @@ for (const id of [
 assert(sister.includes("sister.js"), "sister app");
 assert(him.includes("him.js"), "him app");
 assert(/Sidecar/i.test(sister), "sister must explain the iPad extended screen");
+assert(/hearing aids/i.test(sister), "aids-off warning");
+assert(/mouth/i.test(sister), "lipreading warning");
+assert(/clinic audiogram/i.test(sister), "kitchen vs clinic");
 assert(/him\.html/.test(sister), "sister must point at his page");
 assert(!him.includes("sister-word"), "his page must not include the sister cue id");
 assert(!him.toLowerCase().includes("say  fee"), "his html must not hard-code the cue");

@@ -5,6 +5,9 @@ import {
   bandEnergy,
   transposeLikeProcessor,
   spectrumBandEnergy,
+  hissLikeProcessor,
+  sibilantGate,
+  limitSample,
 } from "./lowering.js";
 
 function assert(cond, msg) {
@@ -30,7 +33,8 @@ const landed = mapTransposeHz(
   SIBILANT_PLAN.dstLo,
   SIBILANT_PLAN.dstHi
 );
-assert(landed > 1500 && landed < 2000, `6 kHz → ${landed}`);
+assert(landed > 1200 && landed < 2000, `6 kHz → ${landed}`);
+assert(SIBILANT_PLAN.srcHi >= 9000, "female /s/ source extends past 8 kHz");
 
 const see = readWavMono(new URL("./audio/see-a.wav", import.meta.url));
 const fee = readWavMono(new URL("./audio/fee-a.wav", import.meta.url));
@@ -52,6 +56,32 @@ assert(
   seeDelta > feeDelta * 4,
   `see should dump more 4–8 kHz into 1–2 kHz than fee (${seeDelta} vs ${feeDelta})`
 );
+
+const seeBurst = see.samples.subarray(Math.floor(0.12 * see.sr), Math.floor(0.26 * see.sr));
+const feeBurst = fee.samples.subarray(Math.floor(0.12 * fee.sr), Math.floor(0.26 * fee.sr));
+const hissSee = hissLikeProcessor(seeBurst, see.sr, SIBILANT_PLAN);
+const hissFee = hissLikeProcessor(feeBurst, fee.sr, SIBILANT_PLAN);
+const hissSeeDest = spectrumBandEnergy(hissSee.aidRe, hissSee.aidIm, see.sr, SIBILANT_PLAN.dstLo, SIBILANT_PLAN.dstHi);
+const hissSeeBefore = spectrumBandEnergy(hissSee.re, hissSee.im, see.sr, SIBILANT_PLAN.dstLo, SIBILANT_PLAN.dstHi);
+const hissFeeDest = spectrumBandEnergy(hissFee.aidRe, hissFee.aidIm, fee.sr, SIBILANT_PLAN.dstLo, SIBILANT_PLAN.dstHi);
+const hissFeeBefore = spectrumBandEnergy(hissFee.re, hissFee.im, fee.sr, SIBILANT_PLAN.dstLo, SIBILANT_PLAN.dstHi);
+assert(hissSee.open, "see must open the sibilant gate");
+assert(hissSeeDest - hissSeeBefore > (hissFeeDest - hissFeeBefore) * 2, "hiss substitution prefers see");
+
+const vowel = new Float64Array(see.sr);
+for (let i = 0; i < vowel.length; i++) vowel[i] = 0.2 * Math.sin((2 * Math.PI * 220 * i) / see.sr);
+const vowelMap = hissLikeProcessor(vowel, see.sr, SIBILANT_PLAN);
+assert(!vowelMap.open, "a low vowel must not open the gate");
+assert(!sibilantGate(1e-8, 1, SIBILANT_PLAN), "tiny highs stay closed");
+
+let env = 0;
+let peak = 0;
+for (let i = 0; i < 40; i++) {
+  const lim = limitSample(1.4, env);
+  env = lim.env;
+  peak = Math.max(peak, Math.abs(lim.s));
+}
+assert(peak <= 0.9, `limiter must catch 1.4 peaks, got ${peak}`);
 
 console.log("lowering tests passed", {
   landed: Math.round(landed),

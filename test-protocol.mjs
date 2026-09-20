@@ -45,12 +45,16 @@ assert(sisterPrompt("fee").includes("FEE"), "sister cue");
 assert(sisterPrompt("see").includes("SEE"), "sister cue see");
 
 const dsp = workletForCondition("dsp");
-assert(dsp.mode === "transpose" && dsp.listen === "aid", "dsp worklet");
+assert((dsp.mode === "hiss" || dsp.mode === "transpose") && dsp.listen === "aid", "dsp worklet");
+assert(dsp.srcHi >= 9000, "source band includes female /s/");
+assert(dsp.gate, "sibilant gate on");
 assert(workletForCondition("dry").mode === "original", "dry is passthrough");
 assert(PHASES.includes("dry") && PHASES.includes("dsp"), "phases");
+assert(!listenerPrompt("turnaway").toLowerCase().includes("fee"), "turnaway must not name the word");
+assert(/mouth/i.test(listenerPrompt("turnaway")), "lipreading warning");
 
 const f = mapTransposeHz(6000, SIBILANT_PLAN.srcLo, SIBILANT_PLAN.srcHi, SIBILANT_PLAN.dstLo, SIBILANT_PLAN.dstHi);
-assert(f != null && f > 1500 && f < 2000, `6 kHz should land near 1.7 kHz, got ${f}`);
+assert(f != null && f > 1200 && f < 2000, `6 kHz should land in the 1–2 kHz band, got ${f}`);
 assert(mapTransposeHz(1000, 3500, 8000, 1000, 2200) == null, "lows stay unmapped");
 
 let m = createModel(2, 7);
@@ -70,5 +74,14 @@ assert(answers === 4, `expected 4 live answers, got ${answers}`);
 assert(m.view === "results", "reaches results");
 assert(m.score.dry.n === 2 && m.score.dsp.n === 2, "both blocks scored");
 assert(m.score.dsp.correct === 2, "correct taps on dsp");
+
+let m2 = createModel(2, 3, { order: "dsp-first" });
+assert(m2.block === "dsp", "dsp can go first");
+m2 = unlockButtons(m2);
+m2 = applyAnswer(m2, currentTrial(m2).word);
+assert(m2.block === "dsp", "still dsp");
+m2 = unlockButtons(m2);
+m2 = applyAnswer(m2, currentTrial(m2).word);
+assert(m2.block === "dry", `after dsp block, dry. got ${m2.block}`);
 
 console.log("protocol tests passed", { f: Math.round(f), dry: s.dry.map((t) => t.word).join(",") });

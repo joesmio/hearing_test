@@ -150,20 +150,27 @@ class HearingProcessor extends AudioWorkletProcessor {
     this.aidPack = new Float32Array(160);
     this.earPack = new Float32Array(160);
     this.frame = 0;
+    this.gateEnv = 0;
+    this.limitEnv = 0;
+    this.rng = 123456789;
     this.cfg = {
       mode: "loss",
       freqs: [250, 500, 1000, 2000, 3000, 4000, 6000, 8000],
       thresh: [20, 20, 25, 35, 50, 65, 70, 75],
       deadDb: 90,
-      srcLo: 3000,
-      srcHi: 7000,
-      dstLo: 1200,
-      dstHi: 2800,
+      srcLo: 3500,
+      srcHi: 10000,
+      dstLo: 1000,
+      dstHi: 2200,
       ratio: 2.2,
       start: 1600,
       listen: "ear",
       mix: 0.85,
       makeup: 2 / 3,
+      gate: true,
+      gateRatio: 2.5,
+      gateFloor: 1e-6,
+      limitCeil: 0.89,
     };
     this.port.onmessage = (e) => {
       const msg = e.data || {};
@@ -172,6 +179,11 @@ class HearingProcessor extends AudioWorkletProcessor {
       Object.assign(this.cfg, msg);
     };
     this.port.postMessage({ type: "ready" });
+  }
+
+  nextRand() {
+    this.rng = (Math.imul(this.rng, 1664525) + 1013904223) | 0;
+    return (this.rng >>> 0) / 4294967296;
   }
 
   applyAid() {
@@ -203,20 +215,49 @@ class HearingProcessor extends AudioWorkletProcessor {
       return;
     }
 
-    if (mode === "transpose") {
+    if (mode === "transpose" || mode === "hiss") {
       aidRe.set(re);
       aidIm.set(im);
-      const mix = cfg.mix;
-      const spanSrc = cfg.srcHi - cfg.srcLo;
-      const spanDst = cfg.dstHi - cfg.dstLo;
-      if (spanSrc > 0 && spanDst > 0) {
-        for (let k = 1; k < n2; k++) {
-          const f = k * binHz;
-          if (f < cfg.srcLo || f >= cfg.srcHi) continue;
-          const t = (f - cfg.srcLo) / spanSrc;
-          const fd = cfg.dstLo + t * spanDst;
-          if (fd < 80 || fd >= sampleRate / 2) continue;
-          addInterp(aidRe, aidIm, fd / binHz, re[k] * mix, im[k] * mix);
+      let srcE = 0;
+      let lfE = 0;
+      let nSrc = 0;
+      for (let k = 1; k < n2; k++) {
+        const f = k * binHz;
+        const mag = re[k] * re[k] + im[k] * im[k];
+        if (f >= 250 && f < Math.min(cfg.srcLo, 2500)) lfE += mag;
+        if (f >= cfg.srcLo && f < cfg.srcHi) {
+          srcE += mag;
+          nSrc += 1;
+        }
+      }
+      const ratio = srcE / (lfE + 1e-18);
+      const want =
+        !cfg.gate || (ratio >= (cfg.gateRatio || 2.5) && srcE >= (cfg.gateFloor || 1e-6));
+      const target = want ? 1 : 0;
+      const coeff = target > this.gateEnv ? 0.62 : 0.11;
+      this.gateEnv += (target - this.gateEnv) * coeff;
+      const g = this.gateEnv * (cfg.mix ?? 0.85);
+      if (g > 0.04 && mode === "transpose") {
+        const spanSrc = cfg.srcHi - cfg.srcLo;
+        const spanDst = cfg.dstHi - cfg.dstLo;
+        if (spanSrc > 0 && spanDst > 0) {
+          for (let k = 1; k < n2; k++) {
+            const f = k * binHz;
+            if (f < cfg.srcLo || f >= cfg.srcHi) continue;
+            const t = (f - cfg.srcLo) / spanSrc;
+            const fd = cfg.dstLo + t * spanDst;
+            if (fd < 80 || fd >= sampleRate / 2) continue;
+            addInterp(aidRe, aidIm, fd / binHz, re[k] * g, im[k] * g);
+          }
+        }
+      }
+      if (g > 0.04 && mode === "hiss") {
+        const env = Math.sqrt(srcE / Math.max(1, nSrc)) * g * 0.55;
+        const k0 = Math.max(1, Math.floor(cfg.dstLo / binHz));
+        const k1 = Math.min(n2, Math.ceil(cfg.dstHi / binHz));
+        for (let k = k0; k < k1; k++) {
+          aidRe[k] += (this.nextRand() * 2 - 1) * env;
+          aidIm[k] += (this.nextRand() * 2 - 1) * env;
         }
       }
       mirrorHermitian(aidRe, aidIm);
@@ -285,10 +326,11 @@ class HearingProcessor extends AudioWorkletProcessor {
       ola[i] += this.re[i] * win[i] * makeup;
     }
 
+    const ceil = cfg.limitCeil || 0.89;
     for (let i = 0; i < HOP; i++) {
       let s = ola[i];
-      if (s > 0.95) s = 0.95;
-      if (s < -0.95) s = -0.95;
+      this.limitEnv = Math.max(Math.abs(s), this.limitEnv * 0.995);
+      if (this.limitEnv > ceil) s *= ceil / this.limitEnv;
       this.outBuf[this.outW] = s;
       this.outW = (this.outW + 1) % this.outBuf.length;
       this.outCount++;

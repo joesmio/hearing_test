@@ -19,6 +19,16 @@
       <button type="button" class="g-word-btn fee" data-word="fee" data-testid="answer-fee">FEE</button>
       <button type="button" class="g-word-btn see" data-word="see" data-testid="answer-see">SEE</button>
     </div>
+    <div id="earAnswers" class="g-answers" hidden data-testid="ear-answers">
+      <button type="button" class="g-word-btn see" data-word="heard" id="answer-heard" data-testid="answer-heard">HEARD</button>
+      <button type="button" class="g-word-btn fee" data-word="missed" id="answer-missed" data-testid="answer-missed">NO</button>
+    </div>
+    <div id="calAnswers" class="g-answers" hidden data-testid="cal-answers">
+      <button type="button" class="g-word-btn see" data-word="heard" id="answer-cal-heard" data-testid="answer-cal-heard">HEARD</button>
+      <button type="button" class="g-word-btn fee" data-word="missed" id="answer-cal-missed" data-testid="answer-cal-missed">NOT YET</button>
+      <button type="button" class="g-word-btn see" data-word="ok" id="answer-cal-ok" hidden data-testid="answer-cal-ok">OK</button>
+      <button type="button" class="g-word-btn fee" data-word="loud" id="answer-cal-loud" hidden data-testid="answer-cal-loud">TOO SHARP</button>
+    </div>
     <section id="results" hidden data-testid="view-results">
       <h2 id="resultHeadline" data-testid="result-headline"></h2>
       <p id="resultBody"></p>

@@ -7,12 +7,24 @@ import {
   sisterPrompt,
   workletForCondition,
 } from "./protocol.js";
+import { SIBILANT_PLAN } from "./lowering.js";
 import { createSync } from "./sync.js";
+import {
+  createEarTest,
+  currentBeep,
+  applyEarAnswer,
+  planFromKitchen,
+  earPlainCopy,
+  createCalTest,
+  applyCalAnswer,
+} from "./audiogram.js";
 
 const params = new URLSearchParams(location.search);
 const uiTest = params.has("ui");
-const perBlock = Math.max(2, Math.min(8, Number(params.get("n")) || 6));
+const perBlock = Math.max(2, Math.min(8, Number(params.get("n")) || 8));
+const forcedOrder = params.get("order") === "dsp" ? "dsp-first" : params.has("n") ? "dry-first" : null;
 
+let activePlan = loadPlan() || { ...SIBILANT_PLAN };
 let model = {
   view: "welcome",
   step: "say",
@@ -24,6 +36,7 @@ let model = {
   live: false,
   hissOn: false,
   seq: 1,
+  plan: activePlan,
 };
 
 let audioCtx = null;
@@ -41,9 +54,47 @@ const $ = (id) => document.getElementById(id);
 const sync = createSync({
   role: "sister",
   onAnswer: (word) => {
+    if (word === "heard" || word === "missed") {
+      if (model.view === "ear") takeEar(word === "heard");
+      else if (model.view === "cal") takeCal(word === "heard" ? "heard" : "missed");
+      return;
+    }
+    if (word === "ok" || word === "loud") {
+      if (model.view === "cal") takeCal(word);
+      return;
+    }
     if (model.view === "trial" && model.step === "listen") takeAnswer(word);
   },
 });
+
+function loadPlan() {
+  try {
+    const raw = localStorage.getItem("fee-see-plan");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function savePlan(plan) {
+  activePlan = plan;
+  model.plan = plan;
+  try {
+    localStorage.setItem("fee-see-plan", JSON.stringify(plan));
+  } catch {
+    /* ignore */
+  }
+  paintPlan();
+}
+
+function paintPlan() {
+  const el = $("planBlurb");
+  if (!el) return;
+  const copy = earPlainCopy(activePlan.kitchen ? activePlan : activePlan.blurb ? activePlan : null);
+  el.textContent = activePlan.blurb
+    ? `${activePlan.blurb}. ${copy.headline}`
+    : "No beep test yet — using a typical 1–2 kHz landing. Run “Find his remaining hearing” if you can.";
+}
 
 function showError(msg) {
   const el = $("appError");
@@ -63,11 +114,12 @@ function trial() {
 
 function setWorklet(condition) {
   if (!workletNode) return;
-  workletNode.port.postMessage(workletForCondition(condition));
+  workletNode.port.postMessage(workletForCondition(condition, activePlan));
 }
 
 function publish() {
   model.seq += 1;
+  model.plan = activePlan;
   const list = model.session ? model.session[model.block] : [];
   model.progress = { n: list.length, i: model.index };
   sync.publish(model);
@@ -75,8 +127,9 @@ function publish() {
 
 function show(name) {
   model.view = name;
-  for (const id of ["view-practice", "view-trial", "view-results"]) {
-    $(id).hidden = id !== `view-${name}`;
+  for (const id of ["view-practice", "view-trial", "view-results", "view-ear", "view-cal"]) {
+    const el = $(id);
+    if (el) el.hidden = id !== `view-${name}`;
   }
   publish();
 }
@@ -99,7 +152,9 @@ function renderTrial() {
     .join("");
   $("sisterWord").textContent = sisterPrompt(t.word);
   $("sisterHint").textContent =
-    model.step === "say" ? "Say it once, toward the lid. He cannot see this." : "Wait — his buttons are live.";
+    model.step === "say"
+      ? "Turn so he cannot see your mouth. Say it once, toward the lid."
+      : "Wait — his buttons are live.";
   $("saidIt").hidden = model.step !== "say";
   $("waitTap").hidden = model.step !== "listen";
   setWorklet(model.block === "dsp" || model.step === "listen" ? t.condition : model.block);
@@ -150,17 +205,9 @@ async function setupAudio() {
       publish();
     }
   };
+  setWorklet("practice");
   await fillOutputs();
   await applyOutput();
-}
-
-function withTimeout(promise, ms, msg) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(msg)), ms);
-    }),
-  ]);
 }
 
 async function ensureAudio() {
@@ -247,6 +294,51 @@ async function applyOutput() {
   }
 }
 
+function makeTone(freq, gain, dur = 0.55) {
+  const sr = audioCtx.sampleRate;
+  const n = Math.floor(sr * dur);
+  const buf = audioCtx.createBuffer(1, n, sr);
+  const d = buf.getChannelData(0);
+  const ramp = Math.floor(sr * 0.02);
+  for (let i = 0; i < n; i++) {
+    let e = 1;
+    if (i < ramp) e = i / ramp;
+    else if (i > n - ramp) e = (n - i) / ramp;
+    d[i] = Math.sin((2 * Math.PI * freq * i) / sr) * gain * e;
+  }
+  return buf;
+}
+
+function makeBandNoise(lo, hi, gain, dur = 0.85) {
+  const sr = audioCtx.sampleRate;
+  const n = Math.floor(sr * dur);
+  const buf = audioCtx.createBuffer(1, n, sr);
+  const d = buf.getChannelData(0);
+  const ramp = Math.floor(sr * 0.03);
+  for (let i = 0; i < n; i++) {
+    let s = 0;
+    for (let f = lo; f < hi; f += 45) s += Math.sin((2 * Math.PI * f * i) / sr + f * 0.01);
+    let e = 1;
+    if (i < ramp) e = i / ramp;
+    else if (i > n - ramp) e = (n - i) / ramp;
+    d[i] = s * e;
+  }
+  let peak = 1e-9;
+  for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(d[i]));
+  const g = gain / peak;
+  for (let i = 0; i < n; i++) d[i] *= g;
+  return buf;
+}
+
+function playRaw(buffer) {
+  stopFileSource();
+  const src = audioCtx.createBufferSource();
+  src.buffer = buffer;
+  src.connect(outputGain);
+  fileSource = src;
+  src.start();
+}
+
 async function playBuffer(buffer, word) {
   await ensureAudio();
   if (audioCtx.state === "suspended") await audioCtx.resume();
@@ -298,14 +390,19 @@ async function previewWord(word) {
   }
 }
 
+function enterPractice(status) {
+  model.live = true;
+  $("meterBox").hidden = false;
+  $("micStatus").textContent = status;
+  setWorklet("practice");
+  show("practice");
+}
+
 async function startLive() {
   $("micStatus").textContent = "Asking for the microphone…";
   try {
     if (uiTest) {
-      model.live = true;
-      $("meterBox").hidden = false;
-      $("micStatus").textContent = "UI test — no microphone. Preview files still play through the trick.";
-      show("practice");
+      enterPractice("UI test — no microphone. Preview files still play through the trick.");
       return;
     }
     await ensureAudio();
@@ -323,16 +420,18 @@ async function startLive() {
     });
     sourceNode = audioCtx.createMediaStreamSource(micStream);
     sourceNode.connect(workletNode);
-    model.live = true;
-    $("meterBox").hidden = false;
-    $("micStatus").textContent = "Microphone is live. Talk toward the lid.";
-    setWorklet("practice");
     await fillOutputs();
-    show("practice");
+    enterPractice("Microphone is live. Talk toward the lid. His own aids stay off.");
     tickLevel();
   } catch (err) {
-    $("micStatus").textContent = `Microphone blocked: ${err.message}`;
-    showError(`Microphone blocked: ${err.message}`);
+    $("micStatus").textContent = `Microphone blocked: ${err.message}. You can still play FEE/SEE or her file through the trick.`;
+    try {
+      await ensureAudio();
+      if (audioCtx.state === "suspended") await audioCtx.resume();
+      enterPractice("No microphone — play a file or the FEE/SEE takes through his headphones.");
+    } catch (e2) {
+      showError(`Microphone blocked: ${err.message}`);
+    }
   }
 }
 
@@ -359,12 +458,112 @@ async function showWhere() {
   }
 }
 
-if ($("runLength")) {
-  $("runLength").textContent = `This run is ${perBlock} without the trick, then ${perBlock} with it — ${perBlock * 2} taps.`;
+function paintBeep() {
+  const beep = currentBeep(model.ear);
+  const label = $("earSister");
+  if (!beep) {
+    if (label) label.textContent = "Done";
+    return;
+  }
+  if (label) label.textContent = beep.kind === "catch" ? "Silence catch" : `${beep.freq} Hz`;
 }
 
+async function playCurrentBeep() {
+  await ensureAudio();
+  if (audioCtx.state === "suspended") await audioCtx.resume();
+  const beep = currentBeep(model.ear);
+  if (!beep) return;
+  if (beep.kind === "catch") {
+    stopFileSource();
+    return;
+  }
+  playRaw(makeTone(beep.freq, beep.gain));
+}
+
+async function startEar() {
+  try {
+    await ensureAudio();
+    if (audioCtx.state === "suspended") await audioCtx.resume();
+    $("meterBox").hidden = false;
+    model.ear = createEarTest();
+    model.cal = null;
+    paintBeep();
+    show("ear");
+    if (!uiTest) await playCurrentBeep();
+  } catch (err) {
+    showError(`Cannot play beeps: ${err.message}`);
+  }
+}
+
+function takeEar(heard) {
+  if (!model.ear || model.ear.done) return;
+  model.ear = applyEarAnswer(model.ear, heard);
+  if (model.ear.done) {
+    const plan = planFromKitchen(model.ear.thresh);
+    plan.falseAlarms = model.ear.falseAlarms;
+    savePlan(plan);
+    const copy = earPlainCopy(plan);
+    $("micStatus").textContent = `${copy.headline} ${copy.body}`;
+    show("practice");
+    return;
+  }
+  paintBeep();
+  publish();
+  if (!uiTest) playCurrentBeep();
+}
+
+async function playCurrentCal() {
+  await ensureAudio();
+  if (audioCtx.state === "suspended") await audioCtx.resume();
+  const cal = model.cal;
+  if (!cal) return;
+  playRaw(makeBandNoise(cal.dstLo, cal.dstHi, cal.gain));
+}
+
+async function startCal() {
+  try {
+    await ensureAudio();
+    if (audioCtx.state === "suspended") await audioCtx.resume();
+    $("meterBox").hidden = false;
+    model.cal = createCalTest(activePlan);
+    $("calSister").textContent = "Playing a quiet parked hiss. He taps HEARD when it just appears.";
+    show("cal");
+    if (!uiTest) await playCurrentCal();
+  } catch (err) {
+    showError(`Cannot play hiss: ${err.message}`);
+  }
+}
+
+function takeCal(tap) {
+  if (!model.cal || model.cal.done) return;
+  model.cal = applyCalAnswer(model.cal, tap);
+  if (model.cal.done) {
+    savePlan({ ...activePlan, mix: model.cal.mix });
+    $("micStatus").textContent = `Hiss locked at mix ${model.cal.mix.toFixed(2)}.`;
+    $("liveGain").value = String(Math.min(1.05, Math.max(0.12, model.cal.mix * 0.55)));
+    if (outputGain) outputGain.gain.value = Number($("liveGain").value);
+    show("practice");
+    return;
+  }
+  $("calSister").textContent =
+    model.cal.phase === "comfort"
+      ? "A little louder now. He taps OK or TOO SHARP."
+      : "Still seeking — playing a bit louder.";
+  publish();
+  if (!uiTest) playCurrentCal();
+}
+
+if ($("runLength")) {
+  $("runLength").textContent = `This run is ${perBlock} without the trick, then ${perBlock} with it — ${perBlock * 2} taps. Blocks swap order across days so practice does not fake the score.`;
+}
+paintPlan();
+
 $("openHim").addEventListener("click", openHim);
+$("startEar").addEventListener("click", startEar);
 $("startMic").addEventListener("click", startLive);
+$("startCal").addEventListener("click", startCal);
+$("earReplay").addEventListener("click", () => playCurrentBeep().catch((err) => showError(err.message)));
+$("calReplay").addEventListener("click", () => playCurrentCal().catch((err) => showError(err.message)));
 $("practiceFee").addEventListener("click", () => {
   model.practiceWord = "fee";
   setWorklet("practice");
@@ -396,9 +595,24 @@ $("beginTest").addEventListener("click", async () => {
   } catch {
     /* offline file:// */
   }
-  model = { ...createModel(perBlock, Date.now() % 100000), live: true };
-  setWorklet("dry");
+  const order = forcedOrder || (Date.now() % 2 ? "dsp-first" : "dry-first");
+  model = {
+    ...createModel(perBlock, Date.now() % 100000, { order, plan: activePlan }),
+    live: true,
+  };
+  setWorklet(model.block === "dsp" ? "dsp" : "dry");
   renderTrial();
+});
+$("playCue").addEventListener("click", async () => {
+  const t = trial();
+  if (!t) return;
+  try {
+    setWorklet(t.condition);
+    const buf = await loadToken(`${t.word}-a`);
+    await playBuffer(buf, null);
+  } catch (err) {
+    showError(err.message || String(err));
+  }
 });
 $("saidIt").addEventListener("click", () => {
   const next = unlockButtons(model);
@@ -417,7 +631,7 @@ $("liveGain").addEventListener("input", () => {
   if (outputGain) outputGain.gain.value = Number($("liveGain").value);
 });
 $("echoToggle").addEventListener("change", () => {
-  if (model.live && !uiTest) startLive();
+  if (model.live && !uiTest && micStream) startLive();
 });
 $("outDevice").addEventListener("change", () => {
   applyOutput();

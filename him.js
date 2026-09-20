@@ -29,6 +29,21 @@ function render(snap) {
     practice.textContent = "";
   }
   $("answers").hidden = !snap.answersOn;
+  const ear = $("earAnswers");
+  if (ear) ear.hidden = !snap.earOn;
+  const cal = $("calAnswers");
+  if (cal) {
+    cal.hidden = !snap.calOn;
+    const comfort = Boolean(snap.calComfort);
+    const heard = $("answer-cal-heard") || cal.querySelector('[data-testid="answer-cal-heard"]');
+    const missed = $("answer-cal-missed") || cal.querySelector('[data-testid="answer-cal-missed"]');
+    const ok = $("answer-cal-ok") || cal.querySelector('[data-testid="answer-cal-ok"]');
+    const loud = $("answer-cal-loud") || cal.querySelector('[data-testid="answer-cal-loud"]');
+    if (heard) heard.hidden = comfort;
+    if (missed) missed.hidden = comfort;
+    if (ok) ok.hidden = !comfort;
+    if (loud) loud.hidden = !comfort;
+  }
   const results = $("results");
   if (snap.results) {
     results.hidden = false;
@@ -61,7 +76,11 @@ fetch("/sync")
   .then((env) => env.listener && render(env.listener))
   .catch(() => {});
 
-$("answers").addEventListener("click", (e) => {
+function tap(e) {
   const btn = e.target.closest("[data-word]");
   if (btn) sync.sendAnswer(btn.dataset.word);
-});
+}
+
+$("answers").addEventListener("click", tap);
+$("earAnswers").addEventListener("click", tap);
+$("calAnswers").addEventListener("click", tap);

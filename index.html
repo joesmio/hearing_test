@@ -16,16 +16,32 @@
 
     <section class="s-card" data-testid="setup">
       <ol class="g-steps">
-        <li>Headphones in the <strong>Mac</strong>, on him. Prefer a cable — Bluetooth adds lag.</li>
-        <li>Open his screen (<code>him.html</code>), then drag that window onto the iPad (Sidecar / extended display), or type the address below in iPad Safari. The iPad is taps only. Sound stays on the Mac.</li>
-        <li>You talk into the Mac lid. He only sees <strong>FEE</strong> and <strong>SEE</strong>.</li>
+        <li>His own hearing aids <strong>off</strong>. Headphones in the <strong>Mac</strong>. Prefer a cable — Bluetooth adds lag.</li>
+        <li>Open his screen (<code>him.html</code>), then drag that window onto the iPad (Sidecar), or type the address below in iPad Safari. Sound stays on the Mac.</li>
+        <li>Find where these headphones still reach him — a kitchen beep test, not a clinic audiogram.</li>
+        <li>He must <strong>not watch her mouth</strong>. You talk into the lid. He only sees <strong>FEE</strong> and <strong>SEE</strong>.</li>
       </ol>
       <div class="s-row">
         <button type="button" id="openHim" class="g-btn g-btn-dark" data-testid="open-him">Open his screen</button>
-        <button type="button" id="startMic" class="g-btn g-btn-go" data-testid="start-mic">Start the Mac microphone</button>
+        <button type="button" id="startEar" class="g-btn g-btn-go" data-testid="start-ear">Find his remaining hearing</button>
+        <button type="button" id="startMic" class="g-btn" data-testid="start-mic">Start the Mac microphone</button>
       </div>
       <p id="himUrl" class="s-url" data-testid="him-url"></p>
       <p id="micStatus" class="g-status" data-testid="mic-status"></p>
+    </section>
+
+    <section id="view-ear" class="s-card" hidden data-testid="view-ear">
+      <p class="g-block">Kitchen beeps · not a clinic test</p>
+      <p id="earSister" class="g-cue-word" data-testid="ear-freq">—</p>
+      <p id="earHint" class="g-hint">A clinic uses a calibrated box and bone conduction. We only need to know which pitches this cable still reaches, so we do not park the hiss in a hole.</p>
+      <button type="button" id="earReplay" class="g-btn" data-testid="ear-replay">Play the beep again</button>
+    </section>
+
+    <section id="view-cal" class="s-card" hidden data-testid="view-cal">
+      <p class="g-block">Hiss loudness</p>
+      <p id="calSister" class="g-prompt" data-testid="cal-status">Playing a quiet parked hiss.</p>
+      <p class="g-hint">He taps when he just hears it. Then we add a little and ask if it is too sharp. That is his volume lock — recruitment leaves a small window.</p>
+      <button type="button" id="calReplay" class="g-btn" data-testid="cal-replay">Play the hiss again</button>
     </section>
 
     <section id="view-practice" class="s-card" hidden data-testid="view-practice">
@@ -40,8 +56,12 @@
         <button type="button" id="previewSee" class="g-btn" data-testid="preview-see">Play SEE through the trick</button>
         <label class="g-hint">Her recording <input id="herFile" type="file" accept="audio/*" data-testid="her-file" /></label>
       </div>
+      <p id="planBlurb" class="g-hint" data-testid="plan-blurb"></p>
       <p id="runLength" class="g-hint" data-testid="run-length"></p>
-      <button type="button" id="beginTest" class="g-btn g-btn-dark" data-testid="begin-test">Start the scored live test</button>
+      <div class="s-row">
+        <button type="button" id="startCal" class="g-btn" data-testid="start-cal">Set hiss loudness</button>
+        <button type="button" id="beginTest" class="g-btn g-btn-dark" data-testid="begin-test">Start the scored live test</button>
+      </div>
     </section>
 
     <section id="view-trial" class="s-card" hidden data-testid="view-trial">
@@ -49,6 +69,7 @@
       <div class="g-progress" id="progress"></div>
       <p id="sisterWord" class="g-cue-word" data-testid="sister-word">—</p>
       <p id="sisterHint" class="g-hint"></p>
+      <button type="button" id="playCue" class="g-btn" data-testid="play-cue">Play this word through his headphones</button>
       <button type="button" id="saidIt" class="g-btn g-btn-go" data-testid="said-it">I said it — unlock his buttons</button>
       <p id="waitTap" class="g-status" hidden data-testid="wait-tap">Waiting for his tap…</p>
     </section>

@@ -2,12 +2,16 @@
 
 export const SIBILANT_PLAN = {
   srcLo: 3500,
-  srcHi: 8000,
+  srcHi: 10000,
   dstLo: 1000,
   dstHi: 2200,
   start: 2000,
   ratio: 2.7,
-  mix: 1,
+  mix: 0.85,
+  mode: "hiss",
+  gate: true,
+  gateRatio: 2.5,
+  gateFloor: 1e-6,
 };
 
 /** Map one source Hertz value into the destination band. */
@@ -59,6 +63,61 @@ export function transposeLikeProcessor(samples, sr, plan = SIBILANT_PLAN) {
     }
   }
   return { re, im, aidRe, aidIm, sr, n };
+}
+
+export function bandEnergyFromSpectrum(re, im, sr, lo, hi) {
+  return spectrumBandEnergy(re, im, sr, lo, hi);
+}
+
+export function sibilantGate(srcE, lfE, plan = SIBILANT_PLAN) {
+  const ratio = srcE / (lfE + 1e-18);
+  return ratio >= (plan.gateRatio ?? 2.5) && srcE >= (plan.gateFloor ?? 1e-6);
+}
+
+/** Envelope-driven noise in the landing band — hiss stays a hiss. */
+export function hissLikeProcessor(samples, sr, plan = SIBILANT_PLAN, rng = mulberry(7)) {
+  const n = 1 << Math.ceil(Math.log2(Math.max(256, samples.length)));
+  const re = new Float64Array(n);
+  const im = new Float64Array(n);
+  const aidRe = new Float64Array(n);
+  const aidIm = new Float64Array(n);
+  for (let i = 0; i < samples.length; i++) re[i] = samples[i];
+  fftRadix2(re, im, false);
+  aidRe.set(re);
+  aidIm.set(im);
+  const srcE = spectrumBandEnergy(re, im, sr, plan.srcLo, plan.srcHi);
+  const lfE = spectrumBandEnergy(re, im, sr, 250, Math.min(plan.srcLo, 2500));
+  const open = !plan.gate || sibilantGate(srcE, lfE, plan);
+  if (open) {
+    const binHz = sr / n;
+    const n2 = n / 2;
+    const k0 = Math.max(1, Math.floor(plan.dstLo / binHz));
+    const k1 = Math.min(n2, Math.ceil(plan.dstHi / binHz));
+    const nSrc = Math.max(1, Math.ceil((plan.srcHi - plan.srcLo) / binHz));
+    const env = Math.sqrt(srcE / nSrc) * (plan.mix ?? 0.85) * 0.55;
+    for (let k = k0; k < k1; k++) {
+      aidRe[k] += (rng() * 2 - 1) * env;
+      aidIm[k] += (rng() * 2 - 1) * env;
+    }
+  }
+  return { re, im, aidRe, aidIm, sr, n, open, srcE, lfE };
+}
+
+export function limitSample(s, env, ceil = 0.89, release = 0.995) {
+  const next = Math.max(Math.abs(s), env * release);
+  const out = next > ceil ? (s * ceil) / next : s;
+  return { s: out, env: next };
+}
+
+function mulberry(seed) {
+  let a = seed >>> 0;
+  return function rand() {
+    a += 0x6d2b79f5;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 export function spectrumBandEnergy(re, im, sr, lo, hi) {

@@ -38,6 +38,17 @@ assert(waiting.himView === "wait", "wait while she reads the word");
 assert(waiting.answersOn === false, "buttons locked");
 assert(listenerSnapshotIsSafe(waiting), "wait is safe");
 
+const ear = toListenerSnapshot({
+  view: "ear",
+  step: "say",
+  score: emptyScore(),
+  ear: { freqs: [1000], index: 0 },
+});
+assert(ear.earOn, "ear buttons");
+assert(ear.prompt === "Did you hear a beep?", ear.prompt);
+assert(!/1000|kHz/i.test(JSON.stringify(ear)), "him must not see the beep frequency");
+assert(listenerSnapshotIsSafe(ear), "ear snapshot");
+
 const practice = toListenerSnapshot({
   view: "practice",
   step: "say",

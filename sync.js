@@ -10,19 +10,27 @@ export function toListenerSnapshot(model) {
   if (view === "trial") {
     himView = step === "listen" ? "listen" : "wait";
   }
+  let phase = view;
+  if (view === "trial") phase = step === "listen" ? "listen" : "turnaway";
+  if (view === "cal" && model.cal && model.cal.phase === "comfort") phase = "cal-comfort";
   const snap = {
     himView,
-    prompt: listenerPrompt(
-      view === "trial" ? (step === "listen" ? "listen" : "turnaway") : view
-    ),
+    prompt: listenerPrompt(phase),
     answersOn: view === "trial" && step === "listen",
+    earOn: view === "ear",
+    calOn: view === "cal",
+    calComfort: Boolean(model.cal && model.cal.phase === "comfort"),
     practiceWord: view === "practice" ? model.practiceWord : null,
     blockLabel:
       view === "trial"
         ? model.block === "dry"
           ? "Her voice as it is"
           : "Computer trick on"
-        : "",
+        : view === "ear"
+          ? "Beeps through these headphones"
+          : view === "cal"
+            ? "Hiss loudness"
+            : "",
     progress: model.progress || { n: 0, i: 0 },
     results: view === "results" ? resultCopy(model.score) : null,
     hissOn: Boolean(model.hissOn),

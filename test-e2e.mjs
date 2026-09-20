@@ -96,6 +96,103 @@ try {
   const setup = await sister.$eval("[data-testid=setup]", (el) => el.textContent);
   assert(/Sidecar/i.test(setup), "sister setup must mention Sidecar / iPad");
 
+  const workletMove = await sister.evaluate(async () => {
+    const ctx = new OfflineAudioContext(1, 44100, 44100);
+    await ctx.audioWorklet.addModule("processor.js");
+    const wav = await fetch("audio/see-a.wav");
+    const srcBuf = await ctx.decodeAudioData(await wav.arrayBuffer());
+    const node = new AudioWorkletNode(ctx, "hearing-processor", {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [1],
+    });
+    node.port.postMessage({
+      mode: "hiss",
+      listen: "aid",
+      srcLo: 3500,
+      srcHi: 10000,
+      dstLo: 1000,
+      dstHi: 2200,
+      mix: 0.85,
+      gate: true,
+    });
+    const src = ctx.createBufferSource();
+    src.buffer = srcBuf;
+    src.connect(node);
+    node.connect(ctx.destination);
+    src.start();
+    const out = await ctx.startRendering();
+    const x = out.getChannelData(0);
+    const n = 1 << Math.ceil(Math.log2(x.length));
+    const re = new Float32Array(n);
+    const im = new Float32Array(n);
+    re.set(x);
+    const rev = new Uint32Array(n);
+    let j = 0;
+    for (let i = 0; i < n; i++) {
+      rev[i] = j;
+      let m = n >> 1;
+      while (m >= 1 && j >= m) {
+        j -= m;
+        m >>= 1;
+      }
+      j += m;
+    }
+    for (let i = 0; i < n; i++) {
+      if (rev[i] > i) {
+        const t = re[i];
+        re[i] = re[rev[i]];
+        re[rev[i]] = t;
+      }
+    }
+    for (let size = 2; size <= n; size *= 2) {
+      const half = size >> 1;
+      const ang = (-2 * Math.PI) / size;
+      const wr0 = Math.cos(ang);
+      const wi0 = Math.sin(ang);
+      for (let i = 0; i < n; i += size) {
+        let wr = 1;
+        let wi = 0;
+        for (let k = 0; k < half; k++) {
+          const ur = re[i + k + half];
+          const ui = im[i + k + half];
+          const tre = wr * ur - wi * ui;
+          const tim = wr * ui + wi * ur;
+          re[i + k + half] = re[i + k] - tre;
+          im[i + k + half] = im[i + k] - tim;
+          re[i + k] += tre;
+          im[i + k] += tim;
+          const nwr = wr * wr0 - wi * wi0;
+          wi = wr * wi0 + wi * wr0;
+          wr = nwr;
+        }
+      }
+    }
+    const binHz = 44100 / n;
+    let dest = 0;
+    let hi = 0;
+    for (let k = 1; k < n / 2; k++) {
+      const f = k * binHz;
+      const e = re[k] * re[k] + im[k] * im[k];
+      if (f >= 1000 && f < 2200) dest += e;
+      if (f >= 4200 && f < 8000) hi += e;
+    }
+    return { dest, hi, peak: Math.max(...x) };
+  });
+  console.log("worklet offline", workletMove);
+  assert(workletMove.dest > 0, "worklet produced landing-band energy");
+  assert(workletMove.peak < 0.95, `limiter held peak ${workletMove.peak}`);
+
+  console.log("start ear");
+  await sister.evaluate(() => document.querySelector("[data-testid=start-ear]").click());
+  await sister.waitForSelector("[data-testid=view-ear]:not([hidden])", { timeout: 8000 });
+  await him.waitForSelector("[data-testid=ear-answers]:not([hidden])", { timeout: 8000 });
+  const earPrompt = await him.$eval("[data-testid=listener-prompt]", (el) => el.textContent);
+  assert(/beep/i.test(earPrompt), earPrompt);
+  const leakedHz = await him.evaluate(() => document.body.innerText);
+  assert(!/\b1000\b|\bkHz\b/i.test(leakedHz), "him saw a frequency");
+  await him.evaluate(() => document.querySelector("[data-testid=answer-heard]").click());
+
   console.log("start mic");
   await sister.evaluate(() => document.querySelector("[data-testid=start-mic]").click());
   await sister.waitForSelector("[data-testid=view-practice]:not([hidden])", { timeout: 8000 });

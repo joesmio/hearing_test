@@ -71,18 +71,18 @@ export function resultCopy(score) {
   const dspPct = dspP == null ? "—" : `${Math.round(dspP * 100)}%`;
   const dryFrac = `${score.dry.correct} / ${score.dry.n}`;
   const dspFrac = `${score.dsp.correct} / ${score.dsp.n}`;
-  let headline = "The computer moved the thin letters down.";
+  let headline = "The computer parked a hiss where he can still hear.";
   let body =
-    "She said fee and see live. F and S are high hisses. Without the trick they often vanish. With the trick, that hiss is copied into a lower band.";
+    "She said fee and see live, facing away so he could not read her mouth. F and S are high hisses. Without the trick they often vanish. With the trick, a puff appears in his remaining band only when the thin letter is there.";
   if (dryP != null && dspP != null && dspP > dryP + 0.08) {
     headline = "With the computer, her fee and see came apart.";
-    body = `Her live voice, no trick: ${dryFrac} (${dryPct}). After the hiss was moved down: ${dspFrac} (${dspPct}).`;
+    body = `Her live voice, no trick: ${dryFrac} (${dryPct}). After the hiss was parked lower: ${dspFrac} (${dspPct}).`;
   } else if (dryP != null && dspP != null && Math.abs(dspP - dryP) <= 0.08) {
     headline = "Those two scores were close.";
     body = `No trick: ${dryFrac}. With the trick: ${dspFrac}. If a normal ear took this test, both should be easy. For him, the first number is the one that usually drops.`;
   } else if (dryP != null && dspP != null && dspP < dryP) {
     headline = "The trick did not help this time.";
-    body = `No trick: ${dryFrac}. With the trick: ${dspFrac}. Sit her closer to the lid mic and try again. A hearing aid may still do this more kindly.`;
+    body = `No trick: ${dryFrac}. With the trick: ${dspFrac}. Sit her closer to the lid, keep his own aids out, and check the beep test landed in a band he still has.`;
   }
   return { headline, body, dryFrac, dspFrac, dryPct, dspPct };
 }
@@ -91,30 +91,41 @@ export function resultCopy(score) {
 export function listenerPrompt(phase) {
   if (phase === "welcome") return "She will talk. You tap the word.";
   if (phase === "practice") return "She will say the word on the screen. Listen for the hiss.";
-  if (phase === "turnaway") return "Look at the person next to you for a moment.";
+  if (phase === "turnaway") return "Do not watch her mouth. Look at this screen.";
   if (phase === "listen") return "What did she say?";
   if (phase === "results") return "How you did with her voice.";
-  return "Headphones on.";
+  if (phase === "ear") return "Did you hear a beep?";
+  if (phase === "cal") return "Tap when you hear the hiss.";
+  if (phase === "cal-comfort") return "Is that hiss too sharp?";
+  return "Headphones on. Own hearing aids off.";
 }
 
 export function sisterPrompt(word) {
   return word === "fee" ? "Say  FEE" : "Say  SEE";
 }
 
-export function workletForCondition(condition) {
+export function workletForCondition(condition, plan = SIBILANT_PLAN) {
+  const cfg = {
+    listen: "aid",
+    gate: plan.gate !== false,
+    ...plan,
+  };
   if (condition === "dsp" || condition === "practice") {
-    return { mode: "transpose", listen: "aid", ...SIBILANT_PLAN };
+    return { ...cfg, mode: plan.mode || "hiss" };
   }
-  return { mode: "original", listen: "aid", ...SIBILANT_PLAN };
+  return { ...cfg, mode: "original" };
 }
 
 export const PHASES = ["welcome", "practice", "dry", "dsp", "results"];
 
-export function createModel(perBlock = 6, seed = 1) {
+export function createModel(perBlock = 6, seed = 1, opts = {}) {
+  const order = opts.order === "dsp-first" ? "dsp-first" : "dry-first";
   return {
     view: "trial",
     step: "say",
-    block: "dry",
+    block: order === "dsp-first" ? "dsp" : "dry",
+    order,
+    finishedBlocks: [],
     index: 0,
     session: buildLiveSession(seed, perBlock),
     score: emptyScore(),
@@ -122,6 +133,7 @@ export function createModel(perBlock = 6, seed = 1) {
     live: true,
     hissOn: false,
     seq: 1,
+    plan: opts.plan || SIBILANT_PLAN,
   };
 }
 
@@ -150,9 +162,12 @@ export function applyAnswer(model, answer) {
   let index = model.index + 1;
   let view = "trial";
   let step = "say";
+  let finishedBlocks = model.finishedBlocks || [];
   if (!model.session[block][index]) {
-    if (block === "dry") {
-      block = "dsp";
+    finishedBlocks = [...finishedBlocks, block];
+    const other = block === "dry" ? "dsp" : "dry";
+    if (!finishedBlocks.includes(other) && model.session[other] && model.session[other].length) {
+      block = other;
       index = 0;
     } else {
       view = "results";
@@ -166,6 +181,7 @@ export function applyAnswer(model, answer) {
     index,
     view,
     step,
+    finishedBlocks,
     practiceWord: null,
     seq: model.seq + 1,
   };
