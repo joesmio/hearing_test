@@ -191,7 +191,17 @@ try {
   assert(/beep/i.test(earPrompt), earPrompt);
   const leakedHz = await him.evaluate(() => document.body.innerText);
   assert(!/\b1000\b|\bkHz\b/i.test(leakedHz), "him saw a frequency");
-  await him.evaluate(() => document.querySelector("[data-testid=answer-heard]").click());
+  await him.evaluate(() => {
+    const btn = document.querySelector("[data-testid=answer-heard]");
+    btn.click();
+    btn.click();
+  });
+  await sister.waitForFunction(
+    () => (document.querySelector("[data-testid=ear-freq]") || {}).textContent === "500 Hz",
+    { timeout: 3000 }
+  );
+  const afterDup = await sister.$eval("[data-testid=ear-freq]", (el) => el.textContent);
+  assert(afterDup === "500 Hz", `duplicate tap skipped a band: ${afterDup}`);
 
   console.log("start mic");
   await sister.evaluate(() => document.querySelector("[data-testid=start-mic]").click());

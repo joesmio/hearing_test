@@ -2,11 +2,13 @@ import {
   createEarTest,
   currentBeep,
   applyEarAnswer,
+  unlockEar,
   gainToKitchenHl,
   planFromKitchen,
   earPlainCopy,
   createCalTest,
   applyCalAnswer,
+  unlockCal,
   KITCHEN_FREQS,
 } from "./audiogram.js";
 
@@ -29,6 +31,9 @@ while (!test.done) {
   } else {
     test = applyEarAnswer(test, heard.has(beep.freq));
   }
+  const dup = applyEarAnswer(test, true);
+  assert(dup === test, "duplicate tap must not skip a frequency");
+  test = unlockEar(test);
   guards += 1;
   assert(guards < 40, "ear test must finish");
 }
@@ -52,8 +57,10 @@ assert(skiPlan.dstHi < skiPlan.srcLo, "landing below source");
 let cal = createCalTest(plan);
 cal = applyCalAnswer(cal, "missed");
 assert(cal.gain > 0.02, "seek climbs");
+cal = unlockCal(cal);
 cal = applyCalAnswer(cal, "heard");
 assert(cal.phase === "comfort", cal.phase);
+cal = unlockCal(cal);
 cal = applyCalAnswer(cal, "ok");
 assert(cal.done && cal.mix > 0.3, "locks a usable mix");
 

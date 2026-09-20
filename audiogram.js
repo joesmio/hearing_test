@@ -27,6 +27,7 @@ export function createEarTest() {
     catchEvery: 4,
     presentations: 0,
     done: false,
+    open: true,
   };
 }
 
@@ -37,8 +38,13 @@ export function currentBeep(test) {
   return { kind: "tone", freq, gain: test.phase === "loud" ? LOUD_GAIN : SCREEN_GAIN };
 }
 
-export function applyEarAnswer(test, heard) {
+export function unlockEar(test) {
   if (!test || test.done) return test;
+  return { ...test, open: true };
+}
+
+export function applyEarAnswer(test, heard) {
+  if (!test || test.done || test.open === false) return test;
   if (test.kind === "catch") {
     const nextIndex = test.index;
     const more = nextIndex < test.freqs.length;
@@ -48,6 +54,7 @@ export function applyEarAnswer(test, heard) {
       kind: "tone",
       presentations: test.presentations + 1,
       done: !more,
+      open: false,
     };
   }
 
@@ -85,6 +92,7 @@ export function applyEarAnswer(test, heard) {
     kind: catchNext ? "catch" : "tone",
     presentations,
     done,
+    open: false,
   };
 }
 
@@ -153,25 +161,31 @@ export function createCalTest(plan) {
     dstLo: plan?.dstLo ?? 1000,
     dstHi: plan?.dstHi ?? 2200,
     done: false,
+    open: true,
   };
 }
 
-export function applyCalAnswer(cal, tap) {
+export function unlockCal(cal) {
   if (!cal || cal.done) return cal;
+  return { ...cal, open: true };
+}
+
+export function applyCalAnswer(cal, tap) {
+  if (!cal || cal.done || cal.open === false) return cal;
   if (cal.phase === "seek") {
     if (tap === "heard") {
       const comfort = Math.min(0.7, cal.gain * 3.16);
-      return { ...cal, phase: "comfort", heardGain: cal.gain, gain: comfort };
+      return { ...cal, phase: "comfort", heardGain: cal.gain, gain: comfort, open: false };
     }
     const up = Math.min(0.7, cal.gain * 1.78);
     if (up >= 0.69 && cal.gain >= 0.6) {
-      return { ...cal, done: true, mix: 0.4, gain: 0.7 };
+      return { ...cal, done: true, mix: 0.4, gain: 0.7, open: false };
     }
-    return { ...cal, gain: up };
+    return { ...cal, gain: up, open: false };
   }
   if (tap === "loud") {
     const mix = Math.max(0.25, (cal.heardGain || 0.02) * 8);
-    return { ...cal, done: true, mix: Math.min(0.7, mix) };
+    return { ...cal, done: true, mix: Math.min(0.7, mix), open: false };
   }
-  return { ...cal, done: true, mix: Math.min(1, Math.max(0.35, (cal.gain || 0.1) * 6)) };
+  return { ...cal, done: true, mix: Math.min(1, Math.max(0.35, (cal.gain || 0.1) * 6)), open: false };
 }

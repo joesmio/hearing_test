@@ -13,10 +13,12 @@ import {
   createEarTest,
   currentBeep,
   applyEarAnswer,
+  unlockEar,
   planFromKitchen,
   earPlainCopy,
   createCalTest,
   applyCalAnswer,
+  unlockCal,
 } from "./audiogram.js";
 
 const params = new URLSearchParams(location.search);
@@ -484,6 +486,7 @@ async function startEar() {
   try {
     model.ear = createEarTest();
     model.cal = null;
+    fetch("/sync?takeAnswers=1").catch(() => {});
     paintBeep();
     if (uiTest) {
       show("ear");
@@ -499,9 +502,22 @@ async function startEar() {
   }
 }
 
+let lastTapKey = "";
+let lastTapAt = 0;
+function debounceTap(key) {
+  const now = Date.now();
+  if (key === lastTapKey && now - lastTapAt < 400) return false;
+  lastTapKey = key;
+  lastTapAt = now;
+  return true;
+}
+
 function takeEar(heard) {
   if (!model.ear || model.ear.done) return;
-  model.ear = applyEarAnswer(model.ear, heard);
+  if (!debounceTap(heard ? "ear-heard" : "ear-missed")) return;
+  const next = applyEarAnswer(model.ear, heard);
+  if (next === model.ear) return;
+  model.ear = next;
   if (model.ear.done) {
     const plan = planFromKitchen(model.ear.thresh);
     plan.falseAlarms = model.ear.falseAlarms;
@@ -513,7 +529,11 @@ function takeEar(heard) {
   }
   paintBeep();
   publish();
-  if (!uiTest) playCurrentBeep();
+  const reopen = () => {
+    if (model.ear && !model.ear.done) model.ear = unlockEar(model.ear);
+  };
+  if (uiTest) setTimeout(reopen, 40);
+  else playCurrentBeep().finally(reopen);
 }
 
 async function playCurrentCal() {
@@ -527,6 +547,7 @@ async function playCurrentCal() {
 async function startCal() {
   try {
     model.cal = createCalTest(activePlan);
+    fetch("/sync?takeAnswers=1").catch(() => {});
     $("calSister").textContent = "Playing a quiet parked hiss. He taps HEARD when it just appears.";
     if (uiTest) {
       show("cal");
@@ -544,7 +565,10 @@ async function startCal() {
 
 function takeCal(tap) {
   if (!model.cal || model.cal.done) return;
-  model.cal = applyCalAnswer(model.cal, tap);
+  if (!debounceTap(`cal-${tap}`)) return;
+  const next = applyCalAnswer(model.cal, tap);
+  if (next === model.cal) return;
+  model.cal = next;
   if (model.cal.done) {
     savePlan({ ...activePlan, mix: model.cal.mix });
     $("micStatus").textContent = `Hiss locked at mix ${model.cal.mix.toFixed(2)}.`;
@@ -558,7 +582,11 @@ function takeCal(tap) {
       ? "A little louder now. He taps OK or TOO SHARP."
       : "Still seeking — playing a bit louder.";
   publish();
-  if (!uiTest) playCurrentCal();
+  const reopen = () => {
+    if (model.cal && !model.cal.done) model.cal = unlockCal(model.cal);
+  };
+  if (uiTest) setTimeout(reopen, 40);
+  else playCurrentCal().finally(reopen);
 }
 
 if ($("runLength")) {
