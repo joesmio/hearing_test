@@ -149,6 +149,7 @@ class HearingProcessor extends AudioWorkletProcessor {
     this.outCount = 0;
     this.aidPack = new Float32Array(160);
     this.earPack = new Float32Array(160);
+    this.micPack = new Float32Array(160);
     this.frame = 0;
     this.gateEnv = 0;
     this.limitEnv = 0;
@@ -303,6 +304,7 @@ class HearingProcessor extends AudioWorkletProcessor {
       re[i] = this.input[i] * win[i];
     }
     fft.transform(re, im, false);
+    packLog(re, im, sampleRate, this.micPack, 80, 8000);
     this.applyAid();
     this.applyEar();
 
@@ -347,6 +349,7 @@ class HearingProcessor extends AudioWorkletProcessor {
       packLog(this.earRe, this.earIm, sampleRate, this.earPack, 80, 8000);
       this.port.postMessage({
         type: "fft",
+        mic: this.micPack.slice(),
         aid: this.aidPack.slice(),
         ear: this.earPack.slice(),
       });

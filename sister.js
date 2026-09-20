@@ -23,6 +23,7 @@ import {
   unlockCal,
 } from "./audiogram.js";
 import { renderHearingChart, hearingPillsHtml } from "./hearing-chart.js";
+import { createLiveSpectrum } from "./live-spectrum.js";
 
 const params = new URLSearchParams(location.search);
 const uiTest = params.has("ui");
@@ -53,6 +54,7 @@ let fileSource = null;
 let micStream = null;
 let analyser = null;
 const tokenCache = new Map();
+const liveScope = createLiveSpectrum();
 
 const $ = (id) => document.getElementById(id);
 
@@ -219,8 +221,14 @@ async function setupAudio() {
   workletNode.connect(outputGain);
   outputGain.connect(audioCtx.destination);
   outputGain.connect(analyser);
+  attachLiveScope();
   workletNode.port.onmessage = (e) => {
     if (!e.data || e.data.type !== "fft") return;
+    liveScope.paintFft(e.data, activePlan);
+    const micBox = $("specMicBox");
+    const aidBox = $("specAidBox");
+    if (micBox) micBox.classList.add("has-signal");
+    if (aidBox) aidBox.classList.add("has-signal");
     const db = e.data.aid;
     const hi = db.slice(Math.floor(db.length * 0.55));
     const hissOn = Math.max(...hi) > -55;
@@ -275,6 +283,11 @@ function reconnectMic() {
   }
 }
 
+function showLiveMeters() {
+  if ($("meterBox")) $("meterBox").hidden = false;
+  if ($("liveScope")) $("liveScope").hidden = false;
+}
+
 function tickLevel() {
   if (!analyser) return;
   const spec = new Uint8Array(analyser.fftSize);
@@ -282,6 +295,7 @@ function tickLevel() {
   let peak = 0;
   for (const v of spec) peak = Math.max(peak, Math.abs(v - 128));
   $("levelBar").style.width = `${Math.min(100, (peak / 60) * 100)}%`;
+  liveScope.paintWave(analyser);
   requestAnimationFrame(tickLevel);
 }
 
@@ -415,12 +429,26 @@ async function previewWord(word) {
   }
 }
 
+function attachLiveScope() {
+  liveScope.attach({
+    wave: $("waveCanvas"),
+    mic: $("specMic"),
+    aid: $("specAid"),
+  });
+}
+
 function enterPractice(status) {
   model.live = true;
-  $("meterBox").hidden = false;
+  showLiveMeters();
+  attachLiveScope();
   $("micStatus").textContent = status;
   setWorklet("practice");
   show("practice");
+  if (uiTest) {
+    for (let i = 0; i < 28; i++) liveScope.paintDemo(activePlan);
+    $("specMicBox")?.classList.add("has-signal");
+    $("specAidBox")?.classList.add("has-signal");
+  }
 }
 
 async function startLive() {
@@ -551,7 +579,7 @@ async function startEar() {
     }
     await ensureAudio();
     if (audioCtx.state === "suspended") await audioCtx.resume();
-    $("meterBox").hidden = false;
+    showLiveMeters();
     show("ear");
     await playCurrentBeep();
   } catch (err) {
@@ -607,7 +635,7 @@ async function startCal() {
     }
     await ensureAudio();
     if (audioCtx.state === "suspended") await audioCtx.resume();
-    $("meterBox").hidden = false;
+    showLiveMeters();
     show("cal");
     await playCurrentCal();
   } catch (err) {
@@ -662,6 +690,13 @@ if (uiTest) {
       }
       model.ear = test;
       enterHearingReview();
+    },
+    paintDemoSpectrum() {
+      attachLiveScope();
+      showLiveMeters();
+      for (let i = 0; i < 28; i++) liveScope.paintDemo(activePlan);
+      $("specMicBox")?.classList.add("has-signal");
+      $("specAidBox")?.classList.add("has-signal");
     },
   };
 }

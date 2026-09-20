@@ -25,6 +25,10 @@ for (const id of [
   "view-review",
   "hearing-chart",
   "accept-hearing",
+  "live-scope",
+  "live-wave",
+  "spec-mic",
+  "spec-aid",
   "score-dry",
   "score-dsp",
   "app-error",
@@ -62,6 +66,8 @@ assert(/#hearingReview\[hidden\]/.test(css), "hearing review hidden must beat di
 assert(him.includes("LOOKS RIGHT"), "him can confirm the kitchen map");
 assert(!/Say\s+SEE/.test(him), "his review must not include her cue");
 assert(/him\.html/.test(sister), "sister must point at his page");
+assert(!him.includes("spec-mic"), "his page must not show her spectrogram");
+assert(!him.includes("live-scope"), "his page must not show the live scope");
 assert(!him.includes("sister-word"), "his page must not include the sister cue id");
 assert(!him.toLowerCase().includes("say  fee"), "his html must not hard-code the cue");
 console.log("html contract passed");

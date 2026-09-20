@@ -223,6 +223,17 @@ try {
   console.log("start mic");
   await sister.evaluate(() => document.querySelector("[data-testid=start-mic]").click());
   await sister.waitForSelector("[data-testid=view-practice]:not([hidden])", { timeout: 8000 });
+  await sister.waitForSelector("[data-testid=live-scope]:not([hidden])", { timeout: 4000 });
+  const scopeOnHim = await him.evaluate(() => Boolean(document.querySelector("[data-testid=live-scope]")));
+  assert(!scopeOnHim, "live spectrum must stay on her laptop");
+  const micPx = await sister.$eval("[data-testid=spec-mic]", (el) => {
+    const ctx = el.getContext("2d");
+    const { data } = ctx.getImageData(0, 0, el.width, el.height);
+    let lit = 0;
+    for (let i = 0; i < data.length; i += 4) lit += data[i] + data[i + 1] + data[i + 2];
+    return lit;
+  });
+  assert(micPx > 1000, `sister spectrogram stayed blank ${micPx}`);
   console.log("practice visible");
   await sister.evaluate(() => document.querySelector("[data-testid=practice-fee]").click());
   await him.waitForFunction(

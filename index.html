@@ -104,6 +104,25 @@
       <button type="button" id="again" class="g-btn g-btn-dark" data-testid="again">Again</button>
     </section>
 
+    <section id="liveScope" class="live-scope" hidden data-testid="live-scope">
+      <p class="g-block">Her voice on this Mac</p>
+      <p class="g-hint">The wiggly line is loudness. The two pictures are pitch over time — low on the bottom, 8 kHz at the top. SEE should light the upper right of “what she said”. With the trick on, a puff should appear in the teal strip on “what he hears”.</p>
+      <canvas id="waveCanvas" class="live-wave" width="720" height="64" data-testid="live-wave" aria-label="Live waveform of her voice"></canvas>
+      <div class="spec-pair">
+        <div class="spec" id="specMicBox" data-testid="spec-mic-box">
+          <header><span>What she said</span><span>250 Hz → 8 kHz</span></header>
+          <canvas id="specMic" width="640" height="168" data-testid="spec-mic"></canvas>
+          <div class="empty">Start the mic or play FEE / SEE — this is her capture.</div>
+        </div>
+        <div class="spec" id="specAidBox" data-testid="spec-aid-box">
+          <header><span>What he hears</span><span>teal strip = parked hiss</span></header>
+          <canvas id="specAid" width="640" height="168" data-testid="spec-aid"></canvas>
+          <div class="empty">The trick draws the thin letters down into the strip.</div>
+        </div>
+      </div>
+      <p class="live-axis" aria-hidden="true"><span>time →</span><span>250</span><span>1k</span><span>2k</span><span>4k</span><span>8k ↑</span></p>
+    </section>
+
     <div class="g-meter" id="meterBox" hidden>
       <span>Your voice</span>
       <div class="g-bar"><i id="levelBar"></i></div>
