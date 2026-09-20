@@ -482,14 +482,18 @@ async function playCurrentBeep() {
 
 async function startEar() {
   try {
-    await ensureAudio();
-    if (audioCtx.state === "suspended") await audioCtx.resume();
-    $("meterBox").hidden = false;
     model.ear = createEarTest();
     model.cal = null;
     paintBeep();
+    if (uiTest) {
+      show("ear");
+      return;
+    }
+    await ensureAudio();
+    if (audioCtx.state === "suspended") await audioCtx.resume();
+    $("meterBox").hidden = false;
     show("ear");
-    if (!uiTest) await playCurrentBeep();
+    await playCurrentBeep();
   } catch (err) {
     showError(`Cannot play beeps: ${err.message}`);
   }
@@ -522,13 +526,17 @@ async function playCurrentCal() {
 
 async function startCal() {
   try {
+    model.cal = createCalTest(activePlan);
+    $("calSister").textContent = "Playing a quiet parked hiss. He taps HEARD when it just appears.";
+    if (uiTest) {
+      show("cal");
+      return;
+    }
     await ensureAudio();
     if (audioCtx.state === "suspended") await audioCtx.resume();
     $("meterBox").hidden = false;
-    model.cal = createCalTest(activePlan);
-    $("calSister").textContent = "Playing a quiet parked hiss. He taps HEARD when it just appears.";
     show("cal");
-    if (!uiTest) await playCurrentCal();
+    await playCurrentCal();
   } catch (err) {
     showError(`Cannot play hiss: ${err.message}`);
   }
