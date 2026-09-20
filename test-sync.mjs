@@ -58,6 +58,29 @@ const practice = toListenerSnapshot({
 assert(practice.practiceWord === "fee", "practice may label the word");
 assert(listenerSnapshotIsSafe(practice), "practice labels are allowed");
 
+const review = toListenerSnapshot({
+  view: "review",
+  score: emptyScore(),
+  hearing: {
+    points: [
+      { freq: 1000, label: "1k", clinicLabel: "1 kHz", hl: 40, band: "still" },
+      { freq: 4000, label: "4k", clinicLabel: "4 kHz", hl: 100, band: "gone" },
+    ],
+    landing: { lo: 800, hi: 1400 },
+    headline: "Does this match the clinic chart?",
+    body: "Quiet at the top.",
+  },
+  seq: 9,
+});
+assert(review.reviewOn, "review buttons");
+assert(review.himView === "review", review.himView);
+assert(review.prompt === "Does this look like your clinic chart?", review.prompt);
+assert(review.hearing.points[0].freq === 1000, "him sees the kitchen map");
+assert(/kHz/.test(JSON.stringify(review.hearing)), "review may name pitches");
+assert(!review.answersOn && !review.earOn, "word and beep buttons stay off");
+assert(listenerSnapshotIsSafe(review), "review snapshot");
+assert(!/Say\s+F/i.test(JSON.stringify(review)), "review must not cue a word");
+
 const leak = { ...listening, targetWord: "see" };
 assert(!listenerSnapshotIsSafe(leak), "reject leaked target");
 

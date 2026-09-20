@@ -1,6 +1,8 @@
 import { createSync, listenerSnapshotIsSafe } from "./sync.js";
+import { renderHearingChart, hearingPillsHtml } from "./hearing-chart.js";
 
 const $ = (id) => document.getElementById(id);
+let lastSeq = 0;
 
 function markLinked() {
   const lamp = $("linkLamp");
@@ -17,6 +19,7 @@ function render(snap) {
     return;
   }
   markLinked();
+  lastSeq = snap.seq || lastSeq;
   $("prompt").textContent = snap.prompt || "Wait for her.";
   $("blockLabel").textContent = snap.blockLabel || "";
   $("hissLamp").classList.toggle("on", snap.hissOn);
@@ -43,6 +46,18 @@ function render(snap) {
     if (missed) missed.hidden = comfort;
     if (ok) ok.hidden = !comfort;
     if (loud) loud.hidden = !comfort;
+  }
+  const review = $("hearingReview");
+  if (review) {
+    const on = Boolean(snap.reviewOn && snap.hearing);
+    review.hidden = !on;
+    if (on) {
+      $("hearingHeadline").textContent = snap.hearing.headline || "Does this match the clinic chart?";
+      $("hearingBody").textContent = snap.hearing.body || "";
+      renderHearingChart($("hearingChart"), snap.hearing);
+      const pills = $("hearingPills");
+      if (pills) pills.innerHTML = hearingPillsHtml(snap.hearing);
+    }
   }
   const results = $("results");
   if (snap.results) {
@@ -78,9 +93,10 @@ fetch("/sync")
 
 function tap(e) {
   const btn = e.target.closest("[data-word]");
-  if (btn) sync.sendAnswer(btn.dataset.word);
+  if (btn) sync.sendAnswer(btn.dataset.word, { seq: lastSeq });
 }
 
 $("answers").addEventListener("click", tap);
 $("earAnswers").addEventListener("click", tap);
 $("calAnswers").addEventListener("click", tap);
+$("hearingReview")?.addEventListener("click", tap);

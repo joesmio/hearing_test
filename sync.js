@@ -13,14 +13,20 @@ export function toListenerSnapshot(model) {
   let phase = view;
   if (view === "trial") phase = step === "listen" ? "listen" : "turnaway";
   if (view === "cal" && model.cal && model.cal.phase === "comfort") phase = "cal-comfort";
+  if (view === "review") {
+    himView = "review";
+    phase = "review";
+  }
   const snap = {
     himView,
     prompt: listenerPrompt(phase),
     answersOn: view === "trial" && step === "listen",
     earOn: view === "ear",
     calOn: view === "cal",
+    reviewOn: view === "review",
     calComfort: Boolean(model.cal && model.cal.phase === "comfort"),
     practiceWord: view === "practice" ? model.practiceWord : null,
+    hearing: view === "review" ? model.hearing || null : null,
     blockLabel:
       view === "trial"
         ? model.block === "dry"
@@ -30,7 +36,9 @@ export function toListenerSnapshot(model) {
           ? "Beeps through these headphones"
           : view === "cal"
             ? "Hiss loudness"
-            : "",
+            : view === "review"
+              ? "Check this against the clinic paper"
+              : "",
     progress: model.progress || { n: 0, i: 0 },
     results: view === "results" ? resultCopy(model.score) : null,
     hissOn: Boolean(model.hissOn),
@@ -71,8 +79,14 @@ export function createSync({ role, onListener, onAnswer }) {
     }).catch(() => {});
   }
 
-  function sendAnswer(word) {
-    const msg = { type: "answer", word, at: Date.now() };
+  function sendAnswer(word, extra = {}) {
+    const msg = {
+      type: "answer",
+      word,
+      at: Date.now(),
+      id: extra.id || `a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      seq: extra.seq,
+    };
     if (bus) bus.postMessage(msg);
     fetch("/sync/answer", {
       method: "POST",
@@ -85,7 +99,7 @@ export function createSync({ role, onListener, onAnswer }) {
     bus.onmessage = (e) => {
       const data = e.data || {};
       if (data.type === "state" && data.listener && onListener) onListener(data.listener);
-      if (data.type === "answer" && data.word && onAnswer) onAnswer(data.word);
+      if (data.type === "answer" && data.word && onAnswer) onAnswer(data.word, data);
     };
   }
 
@@ -116,7 +130,10 @@ export function createSync({ role, onListener, onAnswer }) {
       try {
         const res = await fetch("/sync?takeAnswers=1");
         const env = await res.json();
-        for (const word of env.answers || []) onAnswer(word);
+        for (const item of env.answers || []) {
+          const word = typeof item === "string" ? item : item.word;
+          if (word) onAnswer(word, typeof item === "string" ? { word } : item);
+        }
       } catch {
         /* ignore */
       }

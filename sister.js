@@ -16,10 +16,13 @@ import {
   unlockEar,
   planFromKitchen,
   earPlainCopy,
+  hearingSpectrum,
+  hearingReviewCopy,
   createCalTest,
   applyCalAnswer,
   unlockCal,
 } from "./audiogram.js";
+import { renderHearingChart, hearingPillsHtml } from "./hearing-chart.js";
 
 const params = new URLSearchParams(location.search);
 const uiTest = params.has("ui");
@@ -53,20 +56,40 @@ const tokenCache = new Map();
 
 const $ = (id) => document.getElementById(id);
 
+const seenAnswers = new Set();
+
+function acceptRemoteAnswer(word, meta = {}) {
+  const id = meta.id || (meta.at != null ? `${word}:${meta.at}` : "");
+  if (id) {
+    if (seenAnswers.has(id)) return;
+    seenAnswers.add(id);
+  }
+  if (word === "looks-right") {
+    if (model.view === "review") acceptHearing();
+    return;
+  }
+  if (word === "redo-beeps") {
+    if (model.view === "review") startEar();
+    return;
+  }
+  if (word === "heard" || word === "missed") {
+    if (model.view === "ear") takeEar(word === "heard");
+    else if (model.view === "cal") takeCal(word === "heard" ? "heard" : "missed");
+    return;
+  }
+  if (word === "ok" || word === "loud") {
+    if (model.view === "cal") takeCal(word);
+    return;
+  }
+  if (model.view === "trial" && model.step === "listen") {
+    if (meta.seq != null && model.seq && Number(meta.seq) !== Number(model.seq)) return;
+    takeAnswer(word);
+  }
+}
+
 const sync = createSync({
   role: "sister",
-  onAnswer: (word) => {
-    if (word === "heard" || word === "missed") {
-      if (model.view === "ear") takeEar(word === "heard");
-      else if (model.view === "cal") takeCal(word === "heard" ? "heard" : "missed");
-      return;
-    }
-    if (word === "ok" || word === "loud") {
-      if (model.view === "cal") takeCal(word);
-      return;
-    }
-    if (model.view === "trial" && model.step === "listen") takeAnswer(word);
-  },
+  onAnswer: acceptRemoteAnswer,
 });
 
 function loadPlan() {
@@ -129,7 +152,7 @@ function publish() {
 
 function show(name) {
   model.view = name;
-  for (const id of ["view-practice", "view-trial", "view-results", "view-ear", "view-cal"]) {
+  for (const id of ["view-practice", "view-trial", "view-results", "view-ear", "view-cal", "view-review"]) {
     const el = $(id);
     if (el) el.hidden = id !== `view-${name}`;
   }
@@ -482,6 +505,40 @@ async function playCurrentBeep() {
   playRaw(makeTone(beep.freq, beep.gain));
 }
 
+function paintHearingReview() {
+  const spectrum = model.hearing;
+  const copy = model.reviewCopy || hearingReviewCopy(spectrum);
+  const headline = $("reviewHeadline");
+  const body = $("reviewBody");
+  if (headline) headline.textContent = copy.sisterHeadline;
+  if (body) body.textContent = copy.sisterBody;
+  renderHearingChart($("reviewChart"), spectrum);
+  const pills = $("reviewPills");
+  if (pills) pills.innerHTML = hearingPillsHtml(spectrum);
+}
+
+function enterHearingReview() {
+  const plan = planFromKitchen(model.ear.thresh);
+  plan.falseAlarms = model.ear.falseAlarms || 0;
+  savePlan(plan);
+  const spectrum = hearingSpectrum(model.ear.thresh, plan);
+  model.reviewCopy = hearingReviewCopy(spectrum);
+  model.hearing = {
+    ...spectrum,
+    headline: model.reviewCopy.himHeadline,
+    body: model.reviewCopy.himBody,
+  };
+  const copy = earPlainCopy(plan);
+  $("micStatus").textContent = `${copy.headline} Show him the chart next to his clinic printout before you go on.`;
+  paintHearingReview();
+  show("review");
+}
+
+function acceptHearing() {
+  if (model.view !== "review") return;
+  show("practice");
+}
+
 async function startEar() {
   try {
     model.ear = createEarTest();
@@ -519,12 +576,7 @@ function takeEar(heard) {
   if (next === model.ear) return;
   model.ear = next;
   if (model.ear.done) {
-    const plan = planFromKitchen(model.ear.thresh);
-    plan.falseAlarms = model.ear.falseAlarms;
-    savePlan(plan);
-    const copy = earPlainCopy(plan);
-    $("micStatus").textContent = `${copy.headline} ${copy.body}`;
-    show("practice");
+    enterHearingReview();
     return;
   }
   paintBeep();
@@ -594,6 +646,28 @@ if ($("runLength")) {
 }
 paintPlan();
 
+if (uiTest) {
+  window.feeSeeTest = {
+    completeEar(heardFreqs) {
+      const heard = new Set(heardFreqs || [250, 500, 1000, 1500]);
+      let test = createEarTest();
+      let guard = 0;
+      while (!test.done && guard < 40) {
+        const beep = currentBeep(test);
+        if (!beep) break;
+        if (beep.kind === "catch") test = applyEarAnswer(test, false);
+        else test = applyEarAnswer(test, heard.has(beep.freq));
+        test = unlockEar(test);
+        guard += 1;
+      }
+      model.ear = test;
+      enterHearingReview();
+    },
+  };
+}
+
+$("acceptHearing")?.addEventListener("click", acceptHearing);
+$("redoHearing")?.addEventListener("click", () => startEar());
 $("openHim").addEventListener("click", openHim);
 $("startEar").addEventListener("click", startEar);
 $("startMic").addEventListener("click", startLive);

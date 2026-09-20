@@ -30,6 +30,23 @@
       <button type="button" class="g-word-btn see" data-word="ok" id="answer-cal-ok" hidden data-testid="answer-cal-ok">OK</button>
       <button type="button" class="g-word-btn fee" data-word="loud" id="answer-cal-loud" hidden data-testid="answer-cal-loud">TOO SHARP</button>
     </div>
+    <section id="hearingReview" class="hearing-review" hidden data-testid="hearing-review">
+      <h2 id="hearingHeadline" data-testid="hearing-headline">Does this match the clinic chart?</h2>
+      <p id="hearingBody" data-testid="hearing-body"></p>
+      <div id="hearingChart" class="hearing-chart" data-testid="hearing-chart"></div>
+      <p class="hearing-axis"><span>Heard easily ↑</span><span>Pitch →</span><span>Not heard ↓</span></p>
+      <ul id="hearingPills" class="hearing-pills" data-testid="hearing-pills"></ul>
+      <div class="hearing-legend">
+        <span class="still"><i></i> still there</span>
+        <span class="loud"><i></i> only loud</span>
+        <span class="gone"><i></i> gone</span>
+        <span class="landing"><i></i> hiss sits here</span>
+      </div>
+      <div class="hearing-confirm" data-testid="hearing-confirm">
+        <button type="button" class="g-word-btn see" data-word="looks-right" data-testid="answer-looks-right">LOOKS RIGHT</button>
+        <button type="button" class="g-word-btn fee" data-word="redo-beeps" data-testid="answer-redo-beeps">THAT'S NOT ME</button>
+      </div>
+    </section>
     <section id="results" hidden data-testid="view-results">
       <h2 id="resultHeadline" data-testid="result-headline"></h2>
       <p id="resultBody"></p>

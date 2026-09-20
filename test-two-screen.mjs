@@ -6,6 +6,7 @@ import {
   sisterPrompt,
 } from "./protocol.js";
 import { toListenerSnapshot, listenerSnapshotIsSafe } from "./sync.js";
+import { hearingSpectrum, hearingReviewCopy, planFromKitchen, KITCHEN_FREQS } from "./audiogram.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -46,6 +47,20 @@ assert(model.score.dry.n === 2 && model.score.dsp.n === 2, "both blocks");
 assert(results.results.dspFrac === "2 / 2", results.results.dspFrac);
 assert(sisterCues.length === 4, "four live cues");
 assert(sisterCues.some((c) => c.includes("FEE")) && sisterCues.some((c) => c.includes("SEE")), "both words");
+
+const kitchen = {};
+for (const f of KITCHEN_FREQS) kitchen[f] = f >= 2000 ? 100 : 40;
+const spec = hearingSpectrum(kitchen, planFromKitchen(kitchen));
+const copy = hearingReviewCopy(spec);
+const reviewSnap = toListenerSnapshot({
+  view: "review",
+  score: { dry: { n: 0, correct: 0 }, dsp: { n: 0, correct: 0 } },
+  hearing: { ...spec, headline: copy.himHeadline, body: copy.himBody },
+  seq: 4,
+});
+assert(listenerSnapshotIsSafe(reviewSnap), "review must not leak the sister cue");
+assert(reviewSnap.reviewOn && !reviewSnap.answersOn, "only the sanity-check buttons");
+assert(/clinic/i.test(reviewSnap.prompt + reviewSnap.hearing.headline), "he is asked to check the clinic paper");
 
 console.log("two-screen session passed", {
   cues: sisterCues.join(" | "),

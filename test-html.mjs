@@ -22,6 +22,9 @@ for (const id of [
   "her-file",
   "run-length",
   "begin-test",
+  "view-review",
+  "hearing-chart",
+  "accept-hearing",
   "score-dry",
   "score-dsp",
   "app-error",
@@ -39,6 +42,10 @@ for (const id of [
   "link-lamp",
   "ear-answers",
   "answer-heard",
+  "hearing-review",
+  "hearing-chart",
+  "answer-looks-right",
+  "answer-redo-beeps",
 ]) {
   assert(him.includes(`data-testid="${id}"`), `him missing ${id}`);
 }
@@ -51,6 +58,9 @@ assert(/mouth/i.test(sister), "lipreading warning");
 assert(/clinic audiogram/i.test(sister), "kitchen vs clinic");
 const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 assert(/g-answers\[hidden\]/.test(css), "hidden answer rows must beat display:grid");
+assert(/#hearingReview\[hidden\]/.test(css), "hearing review hidden must beat display");
+assert(him.includes("LOOKS RIGHT"), "him can confirm the kitchen map");
+assert(!/Say\s+SEE/.test(him), "his review must not include her cue");
 assert(/him\.html/.test(sister), "sister must point at his page");
 assert(!him.includes("sister-word"), "his page must not include the sister cue id");
 assert(!him.toLowerCase().includes("say  fee"), "his html must not hard-code the cue");

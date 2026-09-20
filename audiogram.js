@@ -133,6 +133,56 @@ export function planFromKitchen(thresh) {
   return plan;
 }
 
+export function freqShortLabel(hz) {
+  if (hz >= 1000) return hz % 1000 === 0 ? `${hz / 1000}k` : `${(hz / 1000).toFixed(1)}k`;
+  return String(hz);
+}
+
+export function freqClinicLabel(hz) {
+  if (hz >= 1000) return hz % 1000 === 0 ? `${hz / 1000} kHz` : `${(hz / 1000).toFixed(1)} kHz`;
+  return `${hz} Hz`;
+}
+
+/** Kitchen thresholds → clinic-shaped points he can compare to a printout. */
+export function hearingBand(hl) {
+  if (hl < 70) return "still";
+  if (hl < 95) return "loud";
+  return "gone";
+}
+
+export function hearingSpectrum(thresh, plan, freqs = KITCHEN_FREQS) {
+  const points = freqs.map((freq) => {
+    const hl = thresh && thresh[freq] != null ? thresh[freq] : 100;
+    return {
+      freq,
+      label: freqShortLabel(freq),
+      clinicLabel: freqClinicLabel(freq),
+      hl,
+      band: hearingBand(hl),
+    };
+  });
+  return {
+    points,
+    landing: plan ? { lo: plan.dstLo, hi: plan.dstHi } : null,
+    source: plan ? { lo: plan.srcLo, hi: plan.srcHi } : null,
+    kind: plan?.kind || "unknown",
+    blurb: plan?.blurb || "",
+  };
+}
+
+export function hearingReviewCopy(spectrum) {
+  const still = (spectrum?.points || []).filter((p) => p.band === "still").map((p) => p.clinicLabel);
+  const gone = (spectrum?.points || []).filter((p) => p.band === "gone").map((p) => p.clinicLabel);
+  const stillBit = still.length ? still.join(", ") : "almost nothing";
+  const goneBit = gone.length ? gone.join(", ") : "nothing obvious";
+  return {
+    himHeadline: "Does this match the clinic chart?",
+    himBody: `Quiet at the top — same layout as the paper they gave you. These headphones still reached ${stillBit}. Gone: ${goneBit}. The tinted strip is where the computer will park the thin letters.`,
+    sisterHeadline: "Show him this next to his clinic printout.",
+    sisterBody: `Kitchen beeps, not a diagnosis. Still there: ${stillBit}. Gone: ${goneBit}. If his clinic chart drops in a different place, redo the beeps — do not start the word test on a wrong map.`,
+  };
+}
+
 export function earPlainCopy(plan) {
   if (!plan) {
     return {

@@ -95,6 +95,7 @@ export function listenerPrompt(phase) {
   if (phase === "listen") return "What did she say?";
   if (phase === "results") return "How you did with her voice.";
   if (phase === "ear") return "Did you hear a beep?";
+  if (phase === "review") return "Does this look like your clinic chart?";
   if (phase === "cal") return "Tap when you hear the hiss.";
   if (phase === "cal-comfort") return "Is that hiss too sharp?";
   return "Headphones on. Own hearing aids off.";

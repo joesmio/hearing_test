@@ -203,6 +203,23 @@ try {
   const afterDup = await sister.$eval("[data-testid=ear-freq]", (el) => el.textContent);
   assert(afterDup === "500 Hz", `duplicate tap skipped a band: ${afterDup}`);
 
+  console.log("finish kitchen beeps → hearing review");
+  await sister.evaluate(() => window.feeSeeTest.completeEar([250, 500, 1000, 1500]));
+  await sister.waitForSelector("[data-testid=view-review]:not([hidden])", { timeout: 8000 });
+  await him.waitForSelector("[data-testid=hearing-review]:not([hidden])", { timeout: 8000 });
+  const himReview = await him.$eval("[data-testid=hearing-review]", (el) => el.innerText);
+  assert(/clinic/i.test(himReview), `him review copy ${himReview.slice(0, 80)}`);
+  const himChart = await him.$eval("[data-testid=hearing-chart]", (el) => el.innerHTML);
+  assert(/<svg/i.test(himChart), "him saw the hearing chart");
+  const himPills = await him.$eval("[data-testid=hearing-pills]", (el) => el.textContent);
+  assert(/1k|1000/.test(himPills), `him pills ${himPills}`);
+  const leakedCue = await him.evaluate(() => document.body.innerText);
+  assert(!/Say\s+FEE/i.test(leakedCue) && !/Say\s+SEE/i.test(leakedCue), "review leaked a sister cue");
+  await him.evaluate(() => document.querySelector("[data-testid=answer-looks-right]").click());
+  await sister.waitForSelector("[data-testid=view-practice]:not([hidden])", { timeout: 8000 });
+  const reviewGone = await him.$eval("[data-testid=hearing-review]", (el) => el.hidden);
+  assert(reviewGone, "review hides after he confirms");
+
   console.log("start mic");
   await sister.evaluate(() => document.querySelector("[data-testid=start-mic]").click());
   await sister.waitForSelector("[data-testid=view-practice]:not([hidden])", { timeout: 8000 });

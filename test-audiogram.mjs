@@ -1,3 +1,4 @@
+import { hearingChartSvg } from "./hearing-chart.js";
 import {
   createEarTest,
   currentBeep,
@@ -6,6 +7,9 @@ import {
   gainToKitchenHl,
   planFromKitchen,
   earPlainCopy,
+  hearingSpectrum,
+  hearingReviewCopy,
+  hearingBand,
   createCalTest,
   applyCalAnswer,
   unlockCal,
@@ -63,5 +67,25 @@ assert(cal.phase === "comfort", cal.phase);
 cal = unlockCal(cal);
 cal = applyCalAnswer(cal, "ok");
 assert(cal.done && cal.mix > 0.3, "locks a usable mix");
+
+const spectrum = hearingSpectrum(test.thresh, plan);
+assert(spectrum.points.length === KITCHEN_FREQS.length, "every kitchen pitch is on the chart");
+assert(spectrum.points.find((p) => p.freq === 1000).band === "still", "1 kHz still there");
+assert(spectrum.points.find((p) => p.freq === 4000).band === "gone", "4 kHz gone");
+assert(spectrum.landing && spectrum.landing.lo < spectrum.landing.hi, "landing band marked");
+assert(hearingBand(40) === "still" && hearingBand(80) === "loud" && hearingBand(100) === "gone", "bands");
+
+const skiSpec = hearingSpectrum(ski, skiPlan);
+const copy = hearingReviewCopy(skiSpec);
+assert(/clinic/i.test(copy.himHeadline + copy.himBody), copy.himHeadline);
+assert(/quiet at the top/i.test(copy.himBody), copy.himBody);
+assert(skiSpec.points.filter((p) => p.freq < 2000).every((p) => p.band === "still"), "lows remain");
+assert(skiSpec.points.filter((p) => p.freq >= 2000).every((p) => p.band === "gone"), "highs gone");
+
+const svg = hearingChartSvg(skiSpec);
+assert(/<svg/i.test(svg), "clinic-shaped chart is an svg");
+assert(/hiss sits here/.test(svg), "landing band labelled");
+assert(/Heard easily/.test(svg) && /Not heard/.test(svg), "clinic quiet-at-top labels");
+assert(!/<script/i.test(svg), "chart svg must not embed script");
 
 console.log("audiogram tests passed", { blurb: plan.blurb, mix: cal.mix });
