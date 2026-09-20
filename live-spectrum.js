@@ -122,8 +122,14 @@ export function createLiveSpectrum() {
     paintWaveform(wave, waveBytes);
   }
 
-  function paintDemo(plan) {
-    paintFft(demoSeePacks(), plan);
+  function paintDemo(plan, frames = 1) {
+    const packs = demoSeePacks();
+    for (let i = 0; i < frames; i++) paintFft(packs, plan);
+    if (wave) {
+      const bytes = new Uint8Array(1024);
+      for (let i = 0; i < bytes.length; i++) bytes[i] = 128 + Math.sin(i / 9) * 40;
+      paintWaveform(wave, bytes);
+    }
   }
 
   return { attach, paintFft, paintWave, paintDemo };

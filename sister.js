@@ -445,7 +445,7 @@ function enterPractice(status) {
   setWorklet("practice");
   show("practice");
   if (uiTest) {
-    for (let i = 0; i < 28; i++) liveScope.paintDemo(activePlan);
+    liveScope.paintDemo(activePlan, 220);
     $("specMicBox")?.classList.add("has-signal");
     $("specAidBox")?.classList.add("has-signal");
   }
@@ -694,7 +694,7 @@ if (uiTest) {
     paintDemoSpectrum() {
       attachLiveScope();
       showLiveMeters();
-      for (let i = 0; i < 28; i++) liveScope.paintDemo(activePlan);
+      liveScope.paintDemo(activePlan, 220);
       $("specMicBox")?.classList.add("has-signal");
       $("specAidBox")?.classList.add("has-signal");
     },

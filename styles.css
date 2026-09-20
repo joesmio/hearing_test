@@ -1440,6 +1440,25 @@ label.g-hint,
   color: var(--ink-soft);
 }
 
+.live-spec-row {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.live-freq-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin: 28px 0 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  text-align: right;
+}
+
 .spec-pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
