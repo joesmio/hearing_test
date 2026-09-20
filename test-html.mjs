@@ -49,6 +49,8 @@ assert(/Sidecar/i.test(sister), "sister must explain the iPad extended screen");
 assert(/hearing aids/i.test(sister), "aids-off warning");
 assert(/mouth/i.test(sister), "lipreading warning");
 assert(/clinic audiogram/i.test(sister), "kitchen vs clinic");
+const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+assert(/g-answers\[hidden\]/.test(css), "hidden answer rows must beat display:grid");
 assert(/him\.html/.test(sister), "sister must point at his page");
 assert(!him.includes("sister-word"), "his page must not include the sister cue id");
 assert(!him.toLowerCase().includes("say  fee"), "his html must not hard-code the cue");

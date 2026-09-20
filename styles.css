@@ -445,6 +445,13 @@ input[type="file"] { font-size: 0.82rem; }
   gap: 14px;
   margin: 18px 0;
 }
+.g-practice[hidden],
+.g-answers[hidden],
+.s-card[hidden],
+#results[hidden],
+#practiceWord[hidden] {
+  display: none !important;
+}
 .g-word-btn {
   appearance: none;
   border: 0;
