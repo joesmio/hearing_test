@@ -25,6 +25,8 @@ for (const id of [
   "view-review",
   "hearing-chart",
   "accept-hearing",
+  "saved-map",
+  "saved-map-because",
   "live-scope",
   "live-wave",
   "spec-mic",
@@ -48,6 +50,7 @@ for (const id of [
   "answer-heard",
   "hearing-review",
   "hearing-chart",
+  "using-chart",
   "answer-looks-right",
   "answer-redo-beeps",
 ]) {

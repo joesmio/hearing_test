@@ -3,6 +3,20 @@ import { listenerPrompt, resultCopy } from "./protocol.js";
 const CHANNEL = "fee-see-sync";
 const STORE = "fee-see-state";
 
+function chartInUse(model) {
+  const plan = model && model.plan;
+  const view = model && model.view;
+  if (!plan || !plan.kitchen || !plan.because) return null;
+  if (view === "ear" || view === "review") return null;
+  return {
+    kicker: "Saved chart · in use",
+    body: plan.because,
+    savedAt: plan.savedAt || null,
+    source: plan.srcHi > plan.srcLo ? { lo: plan.srcLo, hi: plan.srcHi } : null,
+    landing: plan.dstHi > plan.dstLo ? { lo: plan.dstLo, hi: plan.dstHi } : null,
+  };
+}
+
 export function toListenerSnapshot(model) {
   const view = model.view;
   const step = model.step;
@@ -27,6 +41,7 @@ export function toListenerSnapshot(model) {
     calComfort: Boolean(model.cal && model.cal.phase === "comfort"),
     practiceWord: view === "practice" ? model.practiceWord : null,
     hearing: view === "review" ? model.hearing || null : null,
+    chartInUse: chartInUse(model),
     blockLabel:
       view === "trial"
         ? model.block === "dry"

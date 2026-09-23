@@ -58,6 +58,59 @@ const practice = toListenerSnapshot({
 assert(practice.practiceWord === "fee", "practice may label the word");
 assert(listenerSnapshotIsSafe(practice), "practice labels are allowed");
 
+const practiceUsing = toListenerSnapshot({
+  view: "practice",
+  step: "say",
+  score: emptyScore(),
+  practiceWord: null,
+  plan: {
+    kitchen: true,
+    because:
+      "He missed 4 kHz–8 kHz. The computer takes sound from 4 kHz–8 kHz and parks the hiss at 1 kHz–1.5 kHz, which covers 1 kHz — pitches he still heard.",
+    savedAt: "2026-09-23T12:00:00.000Z",
+    srcLo: 4000,
+    srcHi: 8000,
+    dstLo: 1000,
+    dstHi: 1500,
+  },
+});
+assert(practiceUsing.chartInUse && /parks the hiss/.test(practiceUsing.chartInUse.body), "practice shows the saved chart is in use");
+assert(listenerSnapshotIsSafe(practiceUsing), "in-use chart stays cue-safe");
+assert(!/Say\s+F/i.test(JSON.stringify(practiceUsing)) && !/Say\s+S/i.test(JSON.stringify(practiceUsing)), "chart note must not cue a word");
+
+const listeningWithChart = toListenerSnapshot({
+  view: "trial",
+  step: "listen",
+  block: "dsp",
+  score: emptyScore(),
+  plan: {
+    kitchen: true,
+    because: practiceUsing.chartInUse.body,
+    srcLo: 4000,
+    srcHi: 8000,
+    dstLo: 1000,
+    dstHi: 1500,
+  },
+});
+assert(listeningWithChart.chartInUse, "the word test keeps the saved chart in use");
+assert(listenerSnapshotIsSafe(listeningWithChart), "listen chart note is cue-safe");
+
+const earWithOldChart = toListenerSnapshot({
+  view: "ear",
+  step: "say",
+  score: emptyScore(),
+  plan: {
+    kitchen: true,
+    because: "He missed 4 kHz.",
+    srcLo: 4000,
+    srcHi: 8000,
+    dstLo: 1000,
+    dstHi: 1500,
+  },
+});
+assert(earWithOldChart.chartInUse == null, "a new beep test does not show the previous chart");
+assert(!/kHz/i.test(JSON.stringify(earWithOldChart)), "him must not see pitches during the beeps");
+
 const review = toListenerSnapshot({
   view: "review",
   score: emptyScore(),

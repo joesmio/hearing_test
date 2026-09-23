@@ -60,7 +60,18 @@ const reviewSnap = toListenerSnapshot({
 });
 assert(listenerSnapshotIsSafe(reviewSnap), "review must not leak the sister cue");
 assert(reviewSnap.reviewOn && !reviewSnap.answersOn, "only the sanity-check buttons");
-assert(/clinic/i.test(reviewSnap.prompt + reviewSnap.hearing.headline), "he is asked to check the clinic paper");
+assert(/clinic/i.test(reviewSnap.prompt + reviewSnap.hearing.body), "he can still compare it with the clinic paper");
+assert(/missed/i.test(reviewSnap.hearing.because || reviewSnap.hearing.body), "the chart says which pitches set the change");
+assert(spec.source && spec.landing && spec.landing.hi < spec.source.lo, "landing is the heard side of the measured hole");
+const using = toListenerSnapshot({
+  view: "trial",
+  step: "listen",
+  block: "dsp",
+  score: { dry: { n: 0, correct: 0 }, dsp: { n: 0, correct: 0 } },
+  plan: planFromKitchen(kitchen),
+});
+assert(using.chartInUse && /parks the hiss/i.test(using.chartInUse.body), "word test tells him the saved chart is in use");
+assert(listenerSnapshotIsSafe(using), "in-use chart must not leak the sister cue");
 
 console.log("two-screen session passed", {
   cues: sisterCues.join(" | "),

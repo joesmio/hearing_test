@@ -47,6 +47,17 @@ function render(snap) {
     if (ok) ok.hidden = !comfort;
     if (loud) loud.hidden = !comfort;
   }
+  const using = $("usingChart");
+  if (using) {
+    const note = snap.chartInUse;
+    using.hidden = !note;
+    if (note) {
+      const kicker = $("usingChartKicker");
+      const body = $("usingChartBody");
+      if (kicker) kicker.textContent = note.kicker || "Saved chart · in use";
+      if (body) body.textContent = note.body || "";
+    }
+  }
   const review = $("hearingReview");
   if (review) {
     const on = Boolean(snap.reviewOn && snap.hearing);

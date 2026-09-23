@@ -211,6 +211,7 @@ try {
   assert(/clinic/i.test(himReview), `him review copy ${himReview.slice(0, 80)}`);
   const himChart = await him.$eval("[data-testid=hearing-chart]", (el) => el.innerHTML);
   assert(/<svg/i.test(himChart), "him saw the hearing chart");
+  assert(/hiss sits here/.test(himChart) && /take sound from here/.test(himChart), "chart shows both bands");
   const himPills = await him.$eval("[data-testid=hearing-pills]", (el) => el.textContent);
   assert(/1k|1000/.test(himPills), `him pills ${himPills}`);
   const leakedCue = await him.evaluate(() => document.body.innerText);
@@ -219,6 +220,11 @@ try {
   await sister.waitForSelector("[data-testid=view-practice]:not([hidden])", { timeout: 8000 });
   const reviewGone = await him.$eval("[data-testid=hearing-review]", (el) => el.hidden);
   assert(reviewGone, "review hides after he confirms");
+  const saved = await sister.$eval("[data-testid=saved-map]", (el) => ({ hidden: el.hidden, text: el.innerText }));
+  assert(!saved.hidden && /in use/i.test(saved.text) && /missed/i.test(saved.text), `saved map ${saved.text.slice(0, 180)}`);
+  const usingChart = await him.$eval("[data-testid=using-chart]", (el) => ({ hidden: el.hidden, text: el.innerText }));
+  assert(!usingChart.hidden && /in use/i.test(usingChart.text) && /missed/i.test(usingChart.text), `him in use ${usingChart.text.slice(0, 180)}`);
+  assert(!/Say\s+FEE/i.test(usingChart.text) && !/Say\s+SEE/i.test(usingChart.text), "in-use line leaked a cue");
 
   console.log("start mic");
   await sister.evaluate(() => document.querySelector("[data-testid=start-mic]").click());

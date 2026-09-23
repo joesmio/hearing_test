@@ -18,6 +18,7 @@ import {
   earPlainCopy,
   hearingSpectrum,
   hearingReviewCopy,
+  formatSavedAt,
   createCalTest,
   applyCalAnswer,
   unlockCal,
@@ -108,15 +109,65 @@ function savePlan(plan) {
   model.plan = plan;
   try {
     localStorage.setItem("fee-see-plan", JSON.stringify(plan));
+    if (plan && plan.measured && plan.measured.length) {
+      localStorage.setItem(
+        "fee-see-hearing",
+        JSON.stringify({
+          savedAt: plan.savedAt,
+          points: plan.measured,
+          because: plan.because,
+          srcLo: plan.srcLo,
+          srcHi: plan.srcHi,
+          dstLo: plan.dstLo,
+          dstHi: plan.dstHi,
+          pointCount: plan.pointCount || plan.measured.length,
+        })
+      );
+    }
   } catch {
     /* ignore */
   }
   paintPlan();
+  paintSavedMap();
+}
+
+function spectrumFromPlan(plan) {
+  if (!plan || !plan.measured || !plan.measured.length) return null;
+  const thresh = {};
+  for (const p of plan.measured) thresh[p.freq] = p.hl;
+  return hearingSpectrum(thresh, plan);
+}
+
+function paintSavedMap() {
+  const host = $("savedMap");
+  if (!host) return;
+  const plan = activePlan;
+  const showIt = Boolean(
+    plan && plan.kitchen && plan.measured && plan.measured.length && model.view !== "ear" && model.view !== "review"
+  );
+  host.hidden = !showIt;
+  if (!showIt) return;
+  const kicker = $("savedMapKicker");
+  const because = $("savedMapBecause");
+  const bands = $("savedMapBands");
+  if (kicker) kicker.textContent = `Saved hearing map · ${formatSavedAt(plan.savedAt)} · in use`;
+  if (because) because.textContent = plan.because || plan.blurb || "";
+  renderHearingChart($("savedMapChart"), spectrumFromPlan(plan));
+  if (bands) {
+    const n = plan.measured.length;
+    const take = plan.srcHi > plan.srcLo ? `${Math.round(plan.srcLo)}–${Math.round(plan.srcHi)} Hz` : "nothing moved";
+    const park = plan.dstHi > plan.dstLo ? `${Math.round(plan.dstLo)}–${Math.round(plan.dstHi)} Hz` : "nowhere";
+    bands.textContent = `${n} measured pitches. Rust strip takes ${take}. Teal strip parks the hiss at ${park}.`;
+  }
 }
 
 function paintPlan() {
   const el = $("planBlurb");
   if (!el) return;
+  if (activePlan && activePlan.kitchen && activePlan.measured && activePlan.measured.length) {
+    el.textContent = "The scored test uses the saved chart above. Rust is the sound it takes. Teal is where the hiss sits.";
+    return;
+  }
   const copy = earPlainCopy(activePlan.kitchen ? activePlan : activePlan.blurb ? activePlan : null);
   el.textContent = activePlan.blurb
     ? `${activePlan.blurb}. ${copy.headline}`
@@ -158,6 +209,7 @@ function show(name) {
     const el = $(id);
     if (el) el.hidden = id !== `view-${name}`;
   }
+  paintSavedMap();
   publish();
 }
 
@@ -673,18 +725,21 @@ if ($("runLength")) {
   $("runLength").textContent = `This run is ${perBlock} without the trick, then ${perBlock} with it — ${perBlock * 2} taps. Blocks swap order across days so practice does not fake the score.`;
 }
 paintPlan();
+paintSavedMap();
+if (activePlan && activePlan.kitchen && activePlan.because) publish();
 
 if (uiTest) {
   window.feeSeeTest = {
     completeEar(heardFreqs) {
       const heard = new Set(heardFreqs || [250, 500, 1000, 1500]);
+      const ceiling = heard.size ? Math.max(...heard) : 0;
       let test = createEarTest();
       let guard = 0;
-      while (!test.done && guard < 40) {
+      while (!test.done && guard < 120) {
         const beep = currentBeep(test);
         if (!beep) break;
         if (beep.kind === "catch") test = applyEarAnswer(test, false);
-        else test = applyEarAnswer(test, heard.has(beep.freq));
+        else test = applyEarAnswer(test, beep.freq <= ceiling || heard.has(beep.freq));
         test = unlockEar(test);
         guard += 1;
       }

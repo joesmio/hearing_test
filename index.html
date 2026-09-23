@@ -19,7 +19,7 @@
       <ol class="g-steps">
         <li>His own hearing aids <strong>off</strong>. Headphones in the <strong>Mac</strong>. Prefer a cable — Bluetooth adds lag.</li>
         <li>Open his screen (<code>him.html</code>), then drag that window onto the iPad (Sidecar), or type the address below in iPad Safari. Sound stays on the Mac.</li>
-        <li>Find where these headphones still reach him — a kitchen beep test, not a clinic audiogram. When the beeps finish, his screen shows the shape so he can check it against the clinic paper.</li>
+        <li>Find where these headphones still reach him — a kitchen beep test, not a clinic audiogram. Extra beeps fill in the drop, including above 8 kHz if the highs are missing. That chart is saved, and it is what moves the hiss.</li>
         <li>He must <strong>not watch her mouth</strong>. You talk into the lid. He only sees <strong>FEE</strong> and <strong>SEE</strong>.</li>
       </ol>
       <div class="s-row">
@@ -31,10 +31,17 @@
       <p id="micStatus" class="g-status" data-testid="mic-status"></p>
     </section>
 
+    <section id="savedMap" class="s-card saved-map" hidden data-testid="saved-map">
+      <p class="g-block" id="savedMapKicker" data-testid="saved-map-kicker">Saved hearing map · in use</p>
+      <p id="savedMapBecause" data-testid="saved-map-because"></p>
+      <div id="savedMapChart" class="hearing-chart" data-testid="saved-map-chart"></div>
+      <p id="savedMapBands" class="g-hint" data-testid="saved-map-bands"></p>
+    </section>
+
     <section id="view-ear" class="s-card" hidden data-testid="view-ear">
       <p class="g-block">Kitchen beeps · not a clinic test</p>
       <p id="earSister" class="g-cue-word" data-testid="ear-freq">—</p>
-      <p id="earHint" class="g-hint">A clinic uses a calibrated box and bone conduction. We only need to know which pitches this cable still reaches, so we do not park the hiss in a hole.</p>
+      <p id="earHint" class="g-hint">A clinic uses a calibrated box and bone conduction. Extra beeps are added wherever his answer changes, so the drop — and the hiss that follows it — sits on measured pitches.</p>
       <button type="button" id="earReplay" class="g-btn" data-testid="ear-replay">Play the beep again</button>
     </section>
 
@@ -49,6 +56,7 @@
         <span class="still"><i></i> still there</span>
         <span class="loud"><i></i> only loud</span>
         <span class="gone"><i></i> gone</span>
+        <span class="source"><i></i> take sound from here</span>
         <span class="landing"><i></i> hiss sits here</span>
       </div>
       <div class="hearing-confirm s-row" data-testid="hearing-confirm">

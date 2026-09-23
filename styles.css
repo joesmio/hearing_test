@@ -1094,7 +1094,8 @@ label.g-hint,
 .hearing-chart svg .axis,
 .hearing-chart svg .band,
 .hearing-chart svg .curve,
-.hearing-chart svg .landing { display: inline; }
+.hearing-chart svg .landing,
+.hearing-chart svg .source { display: inline; }
 
 .hearing-chart svg .grid line:not([stroke]) { stroke: var(--line-2); }
 
@@ -1190,6 +1191,31 @@ label.g-hint,
   background: rgba(14, 106, 114, 0.18);
   border: 1px solid var(--see);
 }
+
+.hearing-legend .source i,
+.hearing-legend .source .swatch,
+.hearing-legend [data-kind="source"] i {
+  background: rgba(176, 74, 58, 0.28);
+  border: 1px solid #8a3b32;
+}
+
+.saved-map .hearing-chart svg { min-height: 180px; }
+
+.using-chart {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  padding: 14px 16px;
+  display: grid;
+  gap: 6px;
+  margin: 0 0 16px;
+}
+
+.using-chart[hidden] { display: none !important; }
+
+.using-chart p { margin: 0; }
+
+.h-app .using-chart p { font-size: 1.05rem; }
 
 .h-app .hearing-legend { font-size: 1rem; }
 

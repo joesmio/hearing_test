@@ -2,7 +2,13 @@
 
 import { FREQS, derivePlan, interpThresh } from "./plan.js";
 
-export const KITCHEN_FREQS = [250, 500, 1000, 1500, 2000, 3000, 4000, 6000, 8000];
+/** Starting grid. The test inserts more pitches where his answers change. */
+export const ANCHOR_FREQS = [250, 500, 1000, 1500, 2000, 3000, 4000, 6000, 8000];
+export const KITCHEN_FREQS = ANCHOR_FREQS;
+export const MAX_EAR_POINTS = 16;
+export const MAX_REFINE_WAVES = 2;
+const REFINE_CANDIDATES = [750, 1500, 3000, 6000, 10000];
+const REFINE_RATIO = 1.22;
 
 export const SCREEN_GAIN = 0.06;
 export const LOUD_GAIN = 0.55;
@@ -17,7 +23,7 @@ export function gainToKitchenHl(gain) {
 
 export function createEarTest() {
   return {
-    freqs: KITCHEN_FREQS.slice(),
+    freqs: ANCHOR_FREQS.slice(),
     index: 0,
     phase: "screen",
     kind: "tone",
@@ -26,8 +32,93 @@ export function createEarTest() {
     falseAlarms: 0,
     catchEvery: 4,
     presentations: 0,
+    waves: 0,
     done: false,
     open: true,
+  };
+}
+
+function roundHz(freq) {
+  const step = freq >= 3000 ? 100 : freq >= 800 ? 50 : 25;
+  return Math.round(freq / step) * step;
+}
+
+function alreadyHave(freqs, hz) {
+  return freqs.some((f) => Math.abs(Math.log(f / hz)) < Math.log(1.06));
+}
+
+/**
+ * Add a pitch between neighbours whose hearing changed, and one step above
+ * 8 kHz when the top of the chart is already gone. Flat maps stay on the anchors.
+ */
+export function proposeRefineFreqs(freqs, thresh) {
+  const sorted = [...new Set(freqs)].filter((f) => f > 0).sort((a, b) => a - b);
+  const wanted = [];
+  const push = (hz) => {
+    const f = roundHz(hz);
+    if (f < 200 || f > 12000) return;
+    if (alreadyHave(sorted, f) || alreadyHave(wanted, f)) return;
+    wanted.push(f);
+  };
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i];
+    const b = sorted[i + 1];
+    if (b / a < REFINE_RATIO) continue;
+    const ha = thresh[a] ?? 100;
+    const hb = thresh[b] ?? 100;
+    if (hearingBand(ha) === hearingBand(hb) && Math.abs(ha - hb) < 20) continue;
+    const between = REFINE_CANDIDATES.filter((c) => c > a * 1.08 && c < b / 1.08);
+    if (between.length) {
+      const mid = Math.sqrt(a * b);
+      between.sort((x, y) => Math.abs(Math.log(x / mid)) - Math.abs(Math.log(y / mid)));
+      push(between[0]);
+    } else {
+      push(Math.sqrt(a * b));
+    }
+  }
+
+  const top = sorted[sorted.length - 1];
+  if (top && hearingBand(thresh[top] ?? 100) !== "still") {
+    for (const c of REFINE_CANDIDATES) {
+      if (c / top >= 1.15 && c / top <= 1.45) push(c);
+    }
+  }
+
+  const room = MAX_EAR_POINTS - sorted.length;
+  return wanted.sort((a, b) => a - b).slice(0, Math.max(0, room));
+}
+
+function withRefinement(test, thresh, presentations) {
+  const waves = test.waves || 0;
+  if (waves < MAX_REFINE_WAVES) {
+    const extra = proposeRefineFreqs(test.freqs, thresh);
+    if (extra.length) {
+      const freqs = [...test.freqs, ...extra].sort((a, b) => a - b);
+      const nextIndex = freqs.findIndex((f) => thresh[f] == null);
+      return {
+        ...test,
+        freqs,
+        thresh,
+        phase: "screen",
+        index: nextIndex === -1 ? freqs.length - 1 : nextIndex,
+        kind: "tone",
+        presentations,
+        waves: waves + 1,
+        done: nextIndex === -1,
+        open: false,
+      };
+    }
+  }
+  return {
+    ...test,
+    thresh,
+    phase: "screen",
+    index: Math.max(0, test.freqs.length - 1),
+    kind: "tone",
+    presentations,
+    done: true,
+    open: false,
   };
 }
 
@@ -82,16 +173,16 @@ export function applyEarAnswer(test, heard) {
   }
 
   const presentations = test.presentations + 1;
-  const done = index >= test.freqs.length;
-  const catchNext = !done && presentations > 0 && presentations % test.catchEvery === 0;
+  if (index >= test.freqs.length) return withRefinement(test, thresh, presentations);
+  const catchNext = presentations > 0 && presentations % test.catchEvery === 0;
   return {
     ...test,
     thresh,
     phase,
-    index: done ? test.freqs.length - 1 : index,
+    index,
     kind: catchNext ? "catch" : "tone",
     presentations,
-    done,
+    done: false,
     open: false,
   };
 }
@@ -106,30 +197,141 @@ export function kitchenToPlanThresh(thresh, planFreqs = FREQS) {
   return planFreqs.map((f) => interpThresh(f, kf, kh));
 }
 
+export function measuredPoints(thresh) {
+  return Object.keys(thresh || {})
+    .map((k) => Number(k))
+    .filter((f) => f > 0 && thresh[f] != null)
+    .sort((a, b) => a - b)
+    .map((freq) => {
+      const hl = thresh[freq];
+      return { freq, hl, band: hearingBand(hl), label: freqShortLabel(freq), clinicLabel: freqClinicLabel(freq) };
+    });
+}
+
+function rangePhrase(points) {
+  if (!points.length) return "";
+  const parts = [];
+  let run = [points[0]];
+  const flush = () => {
+    const a = run[0];
+    const b = run[run.length - 1];
+    parts.push(a.freq === b.freq ? a.clinicLabel : `${a.clinicLabel}–${b.clinicLabel}`);
+  };
+  for (let i = 1; i < points.length; i++) {
+    const prev = run[run.length - 1];
+    if (points[i].freq / prev.freq <= 2.5) run.push(points[i]);
+    else {
+      flush();
+      run = [points[i]];
+    }
+  }
+  flush();
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/** The sentence that ties the recorded dots to the two bands the computer will use. */
+export function becauseSentence(points, plan) {
+  const missed = points.filter((p) => p.band !== "still");
+  if (!missed.length || !(plan.srcHi > plan.srcLo)) {
+    const heard = rangePhrase(points.filter((p) => p.band === "still")) || "every pitch we played";
+    return `He still heard ${heard}, so the computer does not move any sound. This chart is saved.`;
+  }
+  if (!(plan.dstHi > plan.dstLo)) {
+    return `He missed ${rangePhrase(missed)}. There is no pitch below that he still heard, so the computer does not park a hiss. This chart is saved.`;
+  }
+  const take = `${freqClinicLabel(plan.srcLo)}–${freqClinicLabel(plan.srcHi)}`;
+  const park = `${freqClinicLabel(plan.dstLo)}–${freqClinicLabel(plan.dstHi)}`;
+  const inBand = points.filter(
+    (p) => p.band === "still" && p.freq >= plan.dstLo - 1 && p.freq <= plan.dstHi + 1
+  );
+  const heardBit = rangePhrase(inBand) || rangePhrase(points.filter((p) => p.band === "still" && p.freq < plan.srcLo));
+  return `He missed ${rangePhrase(missed)}. The computer takes sound from ${take} and parks the hiss at ${park}, which covers ${heardBit || "a lower pitch"} — pitches he still heard.`;
+}
+
 /**
- * Place the hiss in a surviving headphone band, a half-octave below any hole.
- * Specialist kit is not required for this placement. A clinic audiogram is
- * still the right document for diagnosis, bone conduction, and masking.
+ * The recorded dots set both bands. Source is the pitches he did not still hear.
+ * Landing is the highest of those he did, kept strictly below that hole.
  */
 export function planFromKitchen(thresh) {
-  const mapped = kitchenToPlanThresh(thresh);
-  const plan = derivePlan(mapped);
-  const usable = KITCHEN_FREQS.filter((f) => (thresh[f] ?? 100) < 70 && f <= 2500);
-  if (usable.length) {
-    const dest = usable.includes(1000) ? 1000 : usable.includes(1500) ? 1500 : usable[usable.length - 1];
-    const width = dest >= 1500 ? 800 : 1000;
-    plan.dstLo = Math.max(400, dest - width * 0.25);
-    plan.dstHi = Math.min(plan.srcLo - 100, dest + width * 0.75);
-    if (plan.dstHi <= plan.dstLo + 200) plan.dstHi = plan.dstLo + 400;
-    plan.blurb = `${Math.round(plan.srcLo)}–${Math.round(plan.srcHi)} Hz → ${Math.round(plan.dstLo)}–${Math.round(plan.dstHi)} Hz`;
+  const points = measuredPoints(thresh);
+  const freqs = points.map((p) => p.freq);
+  const hl = points.map((p) => p.hl);
+  const mapped = freqs.length ? FREQS.map((f) => interpThresh(f, freqs, hl)) : FREQS.map(() => 100);
+  const plan = derivePlan(mapped, FREQS);
+  const missed = points.filter((p) => p.band !== "still" && p.freq >= 1500);
+  const still = points.filter((p) => p.band === "still");
+
+  if (missed.length && still.length) {
+    const firstMiss = missed[0];
+    const lastStill = [...still].reverse().find((p) => p.freq < firstMiss.freq);
+    let srcLo = firstMiss.freq;
+    if (lastStill) {
+      const edge = Math.round(Math.sqrt(lastStill.freq * firstMiss.freq));
+      srcLo = Math.max(lastStill.freq + 40, Math.min(firstMiss.freq, edge));
+    }
+    let srcHi = firstMiss.freq;
+    for (const p of points) {
+      if (p.freq < firstMiss.freq) continue;
+      if (p.band === "still" && p.freq > firstMiss.freq) break;
+      if (p.band !== "still") srcHi = p.freq;
+    }
+    if (srcHi <= srcLo) srcHi = srcLo + 80;
+    plan.srcLo = Math.round(srcLo);
+    plan.srcHi = Math.round(srcHi);
+
+    const below = still.filter((p) => p.freq < plan.srcLo);
+    const landPool = below.filter((p) => p.freq <= 2500);
+    const pool = landPool.length ? landPool : below;
+    if (pool.length && plan.srcLo > 400) {
+      const dest = pool[pool.length - 1];
+      const lower = [...pool].reverse().find((p) => p.freq <= dest.freq * 0.8) || pool[Math.max(0, pool.length - 2)];
+      let dstLo = lower && lower.freq < dest.freq ? lower.freq : Math.round(dest.freq * 0.65);
+      let dstHi = Math.min(plan.srcLo - 80, Math.round(dest.freq + Math.max(80, (dest.freq - dstLo) * 0.35)));
+      if (dstHi < dest.freq) dstHi = Math.min(plan.srcLo - 80, dest.freq);
+      if (dstLo > dest.freq) dstLo = dest.freq;
+      if (dstHi <= dstLo + 120) dstHi = Math.min(plan.srcLo - 80, dstLo + 400);
+      plan.dstLo = Math.round(dstLo);
+      plan.dstHi = Math.round(Math.max(dstHi, Math.min(dest.freq, plan.srcLo - 80)));
+      plan.mode = "hiss";
+    } else {
+      plan.kind = "captions";
+      plan.mode = "original";
+      plan.srcLo = Math.round(srcLo);
+      plan.srcHi = Math.round(srcHi);
+    }
+  } else if (!missed.length) {
+    plan.kind = "ordinary";
+    plan.mode = "original";
+    plan.srcLo = 0;
+    plan.srcHi = 0;
+    plan.dstLo = 0;
+    plan.dstHi = 0;
+  } else {
+    plan.kind = "captions";
+    plan.mode = "original";
+    plan.srcLo = missed[0].freq;
+    plan.srcHi = Math.max(missed[missed.length - 1].freq, missed[0].freq + 80);
+    plan.dstLo = 0;
+    plan.dstHi = 0;
   }
-  plan.srcHi = Math.max(plan.srcHi, 10000);
-  plan.mode = "hiss";
-  plan.gate = true;
-  plan.mix = 0.85;
+
+  if (plan.mode !== "hiss") {
+    plan.gate = false;
+  } else {
+    plan.mode = "hiss";
+    plan.gate = true;
+    plan.mix = 0.85;
+  }
+  plan.because = becauseSentence(points, plan);
+  plan.blurb = plan.because;
+  plan.savedAt = new Date().toISOString();
+  plan.measured = points;
+  plan.freqs = freqs.length ? freqs : FREQS.slice();
+  plan.thresh = hl.length ? hl : mapped;
   plan.kitchen = true;
-  plan.thresh = mapped;
   plan.falseAlarms = 0;
+  plan.pointCount = points.length;
   return plan;
 }
 
@@ -150,8 +352,26 @@ export function hearingBand(hl) {
   return "gone";
 }
 
-export function hearingSpectrum(thresh, plan, freqs = KITCHEN_FREQS) {
-  const points = freqs.map((freq) => {
+export function formatSavedAt(iso) {
+  const d = new Date(iso || "");
+  if (!iso || Number.isNaN(d.getTime())) return "on this Mac";
+  try {
+    return d.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "on this Mac";
+  }
+}
+
+export function hearingSpectrum(thresh, plan, freqs) {
+  const fromPlan = plan?.measured?.map((p) => p.freq);
+  const fromThresh = thresh
+    ? Object.keys(thresh)
+        .map((k) => Number(k))
+        .filter((f) => f > 0)
+        .sort((a, b) => a - b)
+    : [];
+  const use = freqs && freqs.length ? freqs : fromPlan && fromPlan.length ? fromPlan : fromThresh.length ? fromThresh : KITCHEN_FREQS;
+  const points = use.map((freq) => {
     const hl = thresh && thresh[freq] != null ? thresh[freq] : 100;
     return {
       freq,
@@ -161,25 +381,29 @@ export function hearingSpectrum(thresh, plan, freqs = KITCHEN_FREQS) {
       band: hearingBand(hl),
     };
   });
+  const source = plan && plan.srcHi > plan.srcLo ? { lo: plan.srcLo, hi: plan.srcHi } : null;
+  const landing = plan && plan.dstHi > plan.dstLo ? { lo: plan.dstLo, hi: plan.dstHi } : null;
   return {
     points,
-    landing: plan ? { lo: plan.dstLo, hi: plan.dstHi } : null,
-    source: plan ? { lo: plan.srcLo, hi: plan.srcHi } : null,
+    landing,
+    source,
     kind: plan?.kind || "unknown",
     blurb: plan?.blurb || "",
+    because: plan?.because || "",
+    savedAt: plan?.savedAt || null,
+    pointCount: points.length,
   };
 }
 
 export function hearingReviewCopy(spectrum) {
-  const still = (spectrum?.points || []).filter((p) => p.band === "still").map((p) => p.clinicLabel);
-  const gone = (spectrum?.points || []).filter((p) => p.band === "gone").map((p) => p.clinicLabel);
-  const stillBit = still.length ? still.join(", ") : "almost nothing";
-  const goneBit = gone.length ? gone.join(", ") : "nothing obvious";
+  const because = spectrum?.because || "The tinted bands are exactly what the computer will do with this chart.";
+  const n = spectrum?.points?.length || 0;
+  const when = formatSavedAt(spectrum?.savedAt);
   return {
-    himHeadline: "Does this match the clinic chart?",
-    himBody: `Quiet at the top — same layout as the paper they gave you. These headphones still reached ${stillBit}. Gone: ${goneBit}. The tinted strip is where the computer will park the thin letters.`,
-    sisterHeadline: "Show him this next to his clinic printout.",
-    sisterBody: `Kitchen beeps, not a diagnosis. Still there: ${stillBit}. Gone: ${goneBit}. If his clinic chart drops in a different place, redo the beeps — do not start the word test on a wrong map.`,
+    himHeadline: "This saved chart is what the computer will use.",
+    himBody: `${because} Saved ${when}. ${n} pitches. Quiet at the top — same layout as the clinic paper. If the drop is in the wrong place, tap THAT'S NOT ME.`,
+    sisterHeadline: "Saved. These two bands are the change.",
+    sisterBody: `${because} Saved ${when} on this Mac, and the word test uses this chart. ${n} pitches, not a clinic diagnosis. If his paper drops somewhere else, redo the beeps.`,
   };
 }
 
@@ -197,8 +421,8 @@ export function earPlainCopy(plan) {
     };
   }
   return {
-    headline: "We can park the hiss where he still heard a beep.",
-    body: `${plan.blurb}. Not a medical audiogram: no booth, no bone conduction, no calibrated earphones. Good enough to avoid dumping S into a hole on this Mac.`,
+    headline: "The saved chart is what moves the hiss.",
+    body: `${plan.because || plan.blurb}. Not a medical audiogram: no booth, no bone conduction, no calibrated earphones. Good enough to avoid dumping S into a hole on this Mac.`,
   };
 }
 
